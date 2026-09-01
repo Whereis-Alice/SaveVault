@@ -1,0 +1,10 @@
+Id: SaveVault_fd085db8-9b7c-4f83-a2df-3f0784eae1d0
+Name: Save Vault
+Author: Whereis-Alice
+Version: 1.0.0
+Module: SaveVault.dll
+Type: GenericPlugin
+Icon: icon.png
+Links:
+  - Name: Repository
+    Url: https://github.com/Whereis-Alice/SaveVault

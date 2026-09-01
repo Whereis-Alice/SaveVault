@@ -1,0 +1,324 @@
+<UserControl x:Class="SaveVault.Views.VaultManagerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:SaveVault.Converters"
+             mc:Ignorable="d"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DesignHeight="620" d:DesignWidth="1000">
+
+    <!-- Converter keys are repeated in every control on purpose: a shared ResourceDictionary
+         referenced by pack uri is not reliably resolvable for an assembly Playnite loaded with
+         Assembly.LoadFrom. -->
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <conv:StringToVisibilityConverter x:Key="TextToVis" />
+        <conv:InvertedBooleanToVisibilityConverter x:Key="NotToVis" />
+        <conv:CountToVisibilityConverter x:Key="CountToVis" />
+
+        <Style x:Key="Small" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource SaveVaultSubTextBrush}" />
+            <Setter Property="FontSize" Value="{DynamicResource SaveVaultSmallFontSize}" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="Caption" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource SaveVaultTextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+        </Style>
+
+        <Style x:Key="Chip" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource SaveVaultChipBackgroundBrush}" />
+            <Setter Property="CornerRadius" Value="{DynamicResource SaveVaultCornerRadius}" />
+            <Setter Property="Padding" Value="6,1,6,1" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="Bar" TargetType="Button">
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Padding" Value="10,4,10,4" />
+            <Setter Property="MinWidth" Value="70" />
+        </Style>
+
+        <!-- Quiet text link, templated down to bare text so a row of them reads as a caption
+             instead of a row of filled buttons. -->
+        <Style x:Key="Link" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <TextBlock x:Name="Label" Text="{TemplateBinding Content}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource SaveVaultSubTextBrush}"
+                                   FontSize="{DynamicResource SaveVaultSmallFontSize}" />
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Label" Property="Foreground"
+                                        Value="{DynamicResource SaveVaultAccentBrush}" />
+                                <Setter TargetName="Label" Property="TextDecorations" Value="Underline" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Star drawn as text, not a font glyph: the CJK fallback fonts this library needs would
+             turn a glyph from an icon font into a box. -->
+        <Style x:Key="PinToggle" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="4,0,4,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                            <TextBlock x:Name="Star" Text="&#x2605;" Opacity="0.28"
+                                       Foreground="{DynamicResource SaveVaultSubTextBrush}"
+                                       FontSize="{DynamicResource SaveVaultSmallFontSize}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Star" Property="Opacity" Value="1" />
+                                <Setter TargetName="Star" Property="Foreground"
+                                        Value="{DynamicResource SaveVaultPendingBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Star" Property="Opacity" Value="0.85" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="10,10,10,10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="300" MinWidth="200" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" MinWidth="360" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ================================================================ game list -->
+        <DockPanel Grid.Row="0" Grid.Column="0">
+            <TextBox DockPanel.Dock="Top" Margin="0,0,0,6"
+                     Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged, Delay=250}"
+                     ToolTip="{DynamicResource LOCSaveVaultFilterHint}" />
+
+            <ListBox ItemsSource="{Binding Games}" SelectedItem="{Binding SelectedGame}"
+                     HorizontalContentAlignment="Stretch"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,2,0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="{Binding NameText}" TextTrimming="CharacterEllipsis"
+                                           Foreground="{DynamicResource SaveVaultTextBrush}" />
+                                <TextBlock Text="{Binding StatusText}" Style="{StaticResource Small}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+
+                            <TextBlock Grid.Column="1" Text="{Binding SizeText}" Style="{StaticResource Small}"
+                                       Margin="8,0,0,0" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <GridSplitter Grid.Row="0" Grid.Column="1" Width="6" HorizontalAlignment="Center"
+                      VerticalAlignment="Stretch" Background="Transparent" />
+
+        <!-- ================================================================== details -->
+        <Grid Grid.Row="0" Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Text="{Binding SelectedNameText}" TextTrimming="CharacterEllipsis"
+                       Foreground="{DynamicResource SaveVaultTextBrush}"
+                       FontSize="{DynamicResource SaveVaultHeaderFontSize}" FontWeight="SemiBold"
+                       Margin="0,0,0,8" />
+
+            <WrapPanel Grid.Row="1" Margin="0,0,0,10">
+                <Button Style="{StaticResource Bar}" Command="{Binding BackupCommand}"
+                        Content="{DynamicResource LOCSaveVaultActionBackup}" />
+                <Button Style="{StaticResource Bar}" Command="{Binding DetectCommand}"
+                        Content="{DynamicResource LOCSaveVaultActionDetect}" />
+                <Button Style="{StaticResource Bar}" Command="{Binding RestoreCommand}"
+                        Content="{DynamicResource LOCSaveVaultActionRestore}" />
+                <Button Style="{StaticResource Bar}" Command="{Binding DeleteCommand}"
+                        Content="{DynamicResource LOCSaveVaultActionDelete}" />
+                <Button Style="{StaticResource Bar}" Command="{Binding OpenFolderCommand}"
+                        Content="{DynamicResource LOCSaveVaultActionOpenFolder}" />
+            </WrapPanel>
+
+            <!-- ================================================================== targets -->
+            <StackPanel Grid.Row="2" Margin="0,0,0,10"
+                        Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}}">
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="{DynamicResource LOCSaveVaultTargetsCaption}"
+                               Style="{StaticResource Caption}" Margin="0,0,0,0" />
+                    <Button Grid.Column="1" Style="{StaticResource Link}" Margin="10,0,0,0"
+                            Command="{Binding AddTargetCommand}"
+                            Content="{DynamicResource LOCSaveVaultActionAddTarget}" />
+                    <Button Grid.Column="2" Style="{StaticResource Link}" Margin="12,0,0,0"
+                            Command="{Binding RemoveTargetCommand}"
+                            Content="{DynamicResource LOCSaveVaultActionRemoveTarget}" />
+                </Grid>
+
+                <ListBox ItemsSource="{Binding Targets}" SelectedItem="{Binding SelectedTarget}"
+                         MaxHeight="150" HorizontalContentAlignment="Stretch"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         Visibility="{Binding Targets.Count, Converter={StaticResource CountToVis}}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,1,0,1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <CheckBox Grid.Column="0" IsChecked="{Binding Enabled}" Margin="0,0,8,0"
+                                          VerticalAlignment="Center"
+                                          ToolTip="{DynamicResource LOCSaveVaultTargetEnabledHint}" />
+
+                                <Border Grid.Column="1" Style="{StaticResource Chip}">
+                                    <TextBlock Text="{Binding OriginText}" Style="{StaticResource Small}" />
+                                </Border>
+
+                                <!-- A location that no longer exists is flagged rather than hidden:
+                                     it usually means the game moved, which is exactly when the user
+                                     needs to know it is no longer being captured. -->
+                                <Border Grid.Column="2" Style="{StaticResource Chip}"
+                                        Visibility="{Binding Missing, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="{DynamicResource LOCSaveVaultMissingMark}"
+                                               Foreground="{DynamicResource SaveVaultPendingBrush}"
+                                               FontSize="{DynamicResource SaveVaultSmallFontSize}"
+                                               VerticalAlignment="Center" />
+                                </Border>
+
+                                <Button Grid.Column="3" Style="{StaticResource Link}"
+                                        HorizontalAlignment="Left" HorizontalContentAlignment="Left"
+                                        Content="{Binding PathText}" ToolTip="{Binding PathText}"
+                                        Command="{Binding DataContext.OpenPathCommand,
+                                                  RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <TextBlock Text="{DynamicResource LOCSaveVaultEmptyHint}" Style="{StaticResource Small}"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding Targets.Count, Converter={StaticResource CountToVis},
+                                        ConverterParameter=invert}" />
+            </StackPanel>
+
+            <!-- ================================================================ snapshots -->
+            <DockPanel Grid.Row="3" Visibility="{Binding HasSelection, Converter={StaticResource BoolToVis}}">
+                <TextBlock DockPanel.Dock="Top" Text="{DynamicResource LOCSaveVaultSnapshotsCaption}"
+                           Style="{StaticResource Caption}" />
+
+                <ListBox ItemsSource="{Binding Snapshots}" SelectedItem="{Binding SelectedSnapshot}"
+                         HorizontalContentAlignment="Stretch"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,2,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <ToggleButton Grid.Column="0" Style="{StaticResource PinToggle}"
+                                              IsChecked="{Binding Pinned}"
+                                              ToolTip="{DynamicResource LOCSaveVaultActionPin}" />
+
+                                <TextBlock Grid.Column="1" Text="{Binding MomentText}" Margin="6,0,10,0"
+                                           Foreground="{DynamicResource SaveVaultTextBrush}"
+                                           VerticalAlignment="Center" />
+
+                                <TextBlock Grid.Column="2" Text="{Binding DetailText}"
+                                           Style="{StaticResource Small}"
+                                           ToolTip="{Binding SourcesText}" />
+
+                                <Border Grid.Column="3" Style="{StaticResource Chip}">
+                                    <TextBlock Text="{Binding TriggerText}" Style="{StaticResource Small}" />
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Grid>
+
+        <!-- =================================================================== footer -->
+        <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Grid.Column="0">
+                <TextBlock Text="{Binding TotalText}" Style="{StaticResource Small}"
+                           HorizontalAlignment="Left" />
+                <!-- The quota bar exists so a vault that is about to start pruning is visible
+                     before it silently deletes the oldest snapshot. -->
+                <ProgressBar Height="4" Margin="0,4,12,0" Minimum="0" Maximum="100"
+                             Value="{Binding QuotaPercent, Mode=OneWay}" />
+            </StackPanel>
+
+            <WrapPanel Grid.Row="0" Grid.Column="1" VerticalAlignment="Top">
+                <Button Style="{StaticResource Bar}" Command="{Binding BackupAllCommand}"
+                        Content="{DynamicResource LOCSaveVaultActionBackupAll}" />
+                <Button Style="{StaticResource Bar}" Command="{Binding DetectAllCommand}"
+                        Content="{DynamicResource LOCSaveVaultActionDetectAll}" />
+                <Button Style="{StaticResource Bar}" Command="{Binding PruneCommand}"
+                        Content="{DynamicResource LOCSaveVaultActionPrune}" />
+                <Button Style="{StaticResource Bar}" Command="{Binding RefreshCommand}"
+                        Content="{DynamicResource LOCSaveVaultActionRefresh}" />
+            </WrapPanel>
+
+            <Button Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Style="{StaticResource Link}"
+                    HorizontalAlignment="Left" Margin="0,6,0,0"
+                    Content="{Binding RootText}" ToolTip="{Binding RootText}"
+                    Command="{Binding OpenVaultRootCommand}" />
+        </Grid>
+    </Grid>
+</UserControl>

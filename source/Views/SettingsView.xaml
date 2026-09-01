@@ -1,0 +1,264 @@
+<UserControl x:Class="SaveVault.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             mc:Ignorable="d"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             d:DesignHeight="640" d:DesignWidth="720">
+
+    <UserControl.Resources>
+        <Style x:Key="RowLabel" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+        </Style>
+
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="Opacity" Value="0.65" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,10" />
+        </Style>
+
+        <Style x:Key="SectionCaption" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,4,0,8" />
+        </Style>
+
+        <Style x:Key="Row" TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,0,0,7" />
+        </Style>
+
+        <Style x:Key="Num" TargetType="TextBox">
+            <Setter Property="Width" Value="80" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="Picker" TargetType="ComboBox">
+            <Setter Property="MinWidth" Value="220" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
+
+    <TabControl Margin="0,0,0,0">
+
+        <!-- ============================================================= backup -->
+        <TabItem Header="{DynamicResource LOCSaveVaultSettingsBackup}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,12,12">
+                <StackPanel>
+
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptBackupRoot}" Style="{StaticResource SectionCaption}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox Grid.Column="0" VerticalAlignment="Center"
+                                 Text="{Binding Settings.BackupRoot}" />
+                        <Button Grid.Column="1" Margin="6,0,0,0" Padding="10,3,10,3"
+                                Command="{Binding PickRootCommand}"
+                                Content="{DynamicResource LOCSaveVaultActionBrowse}" />
+                        <Button Grid.Column="2" Margin="6,0,0,0" Padding="10,3,10,3"
+                                Command="{Binding ResetRootCommand}"
+                                Content="{DynamicResource LOCSaveVaultActionDefault}" />
+                        <Button Grid.Column="3" Margin="6,0,0,0" Padding="10,3,10,3"
+                                Command="{Binding OpenRootCommand}"
+                                Content="{DynamicResource LOCSaveVaultActionOpen}" />
+                    </Grid>
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptBackupRootHint}" Style="{StaticResource Hint}" />
+
+                    <Separator Margin="0,4,0,12" />
+
+                    <TextBlock Text="{DynamicResource LOCSaveVaultSettingsWhen}" Style="{StaticResource SectionCaption}" />
+                    <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.BackupOnGameStopped}"
+                              Content="{DynamicResource LOCSaveVaultOptBackupOnStop}" />
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptBackupOnStopHint}" Style="{StaticResource Hint}" />
+                    <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.BackupBeforeLaunch}"
+                              Content="{DynamicResource LOCSaveVaultOptBackupBeforeLaunch}" />
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptBackupBeforeLaunchHint}" Style="{StaticResource Hint}" />
+                    <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.ScheduledBackupEnabled}"
+                              Content="{DynamicResource LOCSaveVaultOptScheduled}" />
+
+                    <Grid HorizontalAlignment="Left" Margin="20,0,0,0"
+                          IsEnabled="{Binding Settings.ScheduledBackupEnabled}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Style="{StaticResource RowLabel}"
+                                   Text="{DynamicResource LOCSaveVaultOptScheduleInterval}" />
+                        <TextBox Grid.Column="1" Style="{StaticResource Num}"
+                                 Text="{Binding Settings.ScheduleIntervalMinutes}" />
+                    </Grid>
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptScheduledHint}" Style="{StaticResource Hint}"
+                               Margin="20,2,0,10" />
+
+                    <Separator Margin="0,4,0,12" />
+
+                    <TextBlock Text="{DynamicResource LOCSaveVaultSettingsRetention}" Style="{StaticResource SectionCaption}" />
+                    <Grid HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource RowLabel}"
+                                   Text="{DynamicResource LOCSaveVaultOptMaxTotal}" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Style="{StaticResource Num}" Margin="0,0,0,6"
+                                 Text="{Binding Settings.MaxTotalMegabytes}" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource RowLabel}"
+                                   Text="{DynamicResource LOCSaveVaultOptMaxSnapshots}" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Style="{StaticResource Num}" Margin="0,0,0,6"
+                                 Text="{Binding Settings.MaxSnapshotsPerGame}" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource RowLabel}"
+                                   Text="{DynamicResource LOCSaveVaultOptKeepDaily}" />
+                        <TextBox Grid.Row="2" Grid.Column="1" Style="{StaticResource Num}" Margin="0,0,0,6"
+                                 Text="{Binding Settings.KeepDaily}" />
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource RowLabel}"
+                                   Text="{DynamicResource LOCSaveVaultOptKeepWeekly}" />
+                        <TextBox Grid.Row="3" Grid.Column="1" Style="{StaticResource Num}"
+                                 Text="{Binding Settings.KeepWeekly}" />
+                    </Grid>
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptRetentionHint}" Style="{StaticResource Hint}"
+                               Margin="0,8,0,10" />
+
+                    <Separator Margin="0,4,0,12" />
+
+                    <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.CompressSnapshots}"
+                              Content="{DynamicResource LOCSaveVaultOptCompress}" />
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptCompressHint}" Style="{StaticResource Hint}" />
+                    <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.IncludeRegistry}"
+                              Content="{DynamicResource LOCSaveVaultOptRegistry}" />
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptRegistryHint}" Style="{StaticResource Hint}" />
+                    <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.ConfirmBeforeRestore}"
+                              Content="{DynamicResource LOCSaveVaultOptConfirmRestore}" />
+                    <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.NotifyOnBackup}"
+                              Content="{DynamicResource LOCSaveVaultOptNotify}" />
+
+                    <Separator Margin="0,4,0,12" />
+
+                    <TextBlock Text="{Binding VaultStats}" Style="{StaticResource RowLabel}"
+                               HorizontalAlignment="Left" Margin="0,0,0,8" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                        <Button Padding="10,3,10,3" Margin="0,0,6,0"
+                                Command="{Binding RefreshStatsCommand}"
+                                Content="{DynamicResource LOCSaveVaultActionRefresh}" />
+                        <Button Padding="10,3,10,3"
+                                Command="{Binding PruneCommand}"
+                                Content="{DynamicResource LOCSaveVaultActionPrune}" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- ============================================================= detection -->
+        <TabItem Header="{DynamicResource LOCSaveVaultSettingsDetect}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,12,12">
+                <StackPanel>
+
+                    <TextBlock Text="{DynamicResource LOCSaveVaultSettingsDetectIntro}" Style="{StaticResource Hint}" />
+
+                    <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.AutoScanNewGames}"
+                              Content="{DynamicResource LOCSaveVaultOptAutoScan}" />
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptAutoScanHint}" Style="{StaticResource Hint}" />
+
+                    <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.ScanInstallDir}"
+                              Content="{DynamicResource LOCSaveVaultOptScanInstall}" />
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptScanInstallHint}" Style="{StaticResource Hint}" />
+
+                    <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.ScanUserFolders}"
+                              Content="{DynamicResource LOCSaveVaultOptScanUser}" />
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptScanUserHint}" Style="{StaticResource Hint}" />
+
+                    <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.RuntimeLearning}"
+                              Content="{DynamicResource LOCSaveVaultOptLearning}" />
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptLearningHint}" Style="{StaticResource Hint}" />
+
+                    <Separator Margin="0,4,0,12" />
+
+                    <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.UseLudusaviManifest}"
+                              Content="{DynamicResource LOCSaveVaultOptUseLudusavi}" />
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptUseLudusaviHint}" Style="{StaticResource Hint}" />
+
+                    <Grid IsEnabled="{Binding Settings.UseLudusaviManifest}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox Grid.Column="0" VerticalAlignment="Center"
+                                 Text="{Binding Settings.LudusaviManifestPath}" />
+                        <Button Grid.Column="1" Margin="6,0,0,0" Padding="10,3,10,3"
+                                Command="{Binding PickManifestCommand}"
+                                Content="{DynamicResource LOCSaveVaultActionBrowse}" />
+                        <Button Grid.Column="2" Margin="6,0,0,0" Padding="10,3,10,3"
+                                Command="{Binding ReloadManifestCommand}"
+                                Content="{DynamicResource LOCSaveVaultActionReload}" />
+                    </Grid>
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptManifestPathHint}" Style="{StaticResource Hint}" />
+
+                    <Separator Margin="0,4,0,12" />
+
+                    <TextBlock Text="{DynamicResource LOCSaveVaultSettingsLimits}" Style="{StaticResource SectionCaption}" />
+                    <Grid HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource RowLabel}"
+                                   Text="{DynamicResource LOCSaveVaultOptMaxCandidateSize}" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Style="{StaticResource Num}" Margin="0,0,0,6"
+                                 Text="{Binding Settings.MaxCandidateMegabytes}" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource RowLabel}"
+                                   Text="{DynamicResource LOCSaveVaultOptMaxCandidateFiles}" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Style="{StaticResource Num}"
+                                 Text="{Binding Settings.MaxCandidateFiles}" />
+                    </Grid>
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptCandidateHint}" Style="{StaticResource Hint}"
+                               Margin="0,8,0,10" />
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- ================================================================= about -->
+        <TabItem Header="{DynamicResource LOCSaveVaultSettingsAbout}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12,12,12,12">
+                <StackPanel>
+                    <TextBlock Text="{Binding VersionText}" Style="{StaticResource SectionCaption}" />
+                    <TextBlock Text="{DynamicResource LOCSaveVaultAboutIntro}" Style="{StaticResource Hint}" />
+
+                    <TextBlock Text="{DynamicResource LOCSaveVaultAboutThemeKeys}" Style="{StaticResource SectionCaption}" />
+                    <TextBlock Text="{DynamicResource LOCSaveVaultAboutThemeKeysHint}" Style="{StaticResource Hint}" />
+
+                    <!-- Listed rather than documented elsewhere: a theme author needs the exact key
+                         names, and this list is generated from the same source the defaults are. -->
+                    <ItemsControl ItemsSource="{Binding ThemeKeys}" Margin="0,0,0,10">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" Opacity="0.75" Margin="0,0,0,2"
+                                           FontFamily="Consolas" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+    </TabControl>
+</UserControl>

@@ -1,0 +1,22 @@
+﻿AddonId: SaveVault_fd085db8-9b7c-4f83-a2df-3f0784eae1d0
+Packages:
+  - Version: 1.0.0
+    RequiredApiVersion: 6.0.0
+    ReleaseDate: 2026-09-01
+    PackageUrl: https://github.com/Whereis-Alice/SaveVault/releases/download/1.0.0/SaveVault_fd085db8-9b7c-4f83-a2df-3f0784eae1d0_1_0_0.pext
+    Changelog:
+      - Initial release: versioned save-game snapshots for the whole Playnite library, with no external tool required
+      - Six detection layers merged by trust: manual, learned while playing, Ludusavi manifest, install folder, user folders, registry guess
+      - Runtime learning watches the game while it runs and records the folders it actually writes to, which is what finally covers doujin and Japanese visual novels
+      - Loose save files in the install root are captured with a file filter, so the game itself is never packed into the archive
+      - Word-boundary prefix matching plus a noise list and a size gate keep asset, build and cache folders out of the results
+      - Snapshots are zip archives with a manifest, grouped per game, and only written when the save actually changed
+      - Retention keeps the newest and all pinned snapshots, then one per day and one per week, under a global size quota
+      - The global quota deletes the oldest unpinned snapshot first and never removes a game's only snapshot
+      - Restore writes an undo snapshot first, so every restore can be rolled back
+      - Optional registry backup through reg.exe, off by default, with an exported undo copy before every import
+      - Details view panel showing save locations, recent snapshots and backup, detect and manage actions
+      - Manager window with library-wide filtering, statistics and bulk detect, backup and prune
+      - Backup triggers: after play, before launch, on a schedule, or manually
+      - Publishes 16 theme resource keys so themes can restyle every surface
+      - English and Simplified Chinese UI
