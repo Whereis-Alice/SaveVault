@@ -1,5 +1,20 @@
 ﻿AddonId: SaveVault_fd085db8-9b7c-4f83-a2df-3f0784eae1d0
 Packages:
+  - Version: 1.0.1
+    RequiredApiVersion: 6.0.0
+    ReleaseDate: 2026-09-04
+    PackageUrl: https://github.com/Whereis-Alice/SaveVault/releases/download/1.0.1/SaveVault_fd085db8-9b7c-4f83-a2df-3f0784eae1d0_1_0_1.pext
+    Changelog:
+      - Runtime learning now has to prove a folder belongs to the game: under the install folder or its UAC mirror, a path segment matching the title, or a path segment that literally means saves
+      - A folder that only qualifies by sitting in the install directory must also have written a file that looks like a save, which keeps logs and shader caches out
+      - The application blocklist, the vault root and Playnite config exclusions and the candidate size caps now apply to learned folders too
+      - Learned locations recorded by 1.0.0 are re-checked once on startup and the bad ones are removed with a notification
+      - New main menu entry to re-check learned locations, which also offers to delete the snapshots those locations produced and re-backs up the game afterwards
+      - Nested duplicate locations of one game are collapsed to the outermost folder, so the inner files are no longer packed twice
+      - New per snapshot limit, 512 MB and 20000 files by default and 0 to disable: an oversized location is skipped with an explicit notice instead of silently writing a multi gigabyte archive
+      - A library wide backup now reports which games were skipped for being over that limit
+      - Prune and re-check report how far the vault is over its budget and name the three largest games, because retention never deletes a game's only snapshot and cannot enforce the quota on its own
+      - Fixed the Chinese over budget message, which had its two numbers the wrong way round
   - Version: 1.0.0
     RequiredApiVersion: 6.0.0
     ReleaseDate: 2026-09-01

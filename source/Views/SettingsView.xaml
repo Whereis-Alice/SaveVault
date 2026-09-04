@@ -233,6 +233,32 @@
                     </Grid>
                     <TextBlock Text="{DynamicResource LOCSaveVaultOptCandidateHint}" Style="{StaticResource Hint}"
                                Margin="0,8,0,10" />
+
+                    <Separator Margin="0,4,0,12" />
+
+                    <TextBlock Text="{DynamicResource LOCSaveVaultSettingsSnapshotLimits}" Style="{StaticResource SectionCaption}" />
+                    <Grid HorizontalAlignment="Left">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource RowLabel}"
+                                   Text="{DynamicResource LOCSaveVaultOptMaxSnapshotSize}" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Style="{StaticResource Num}" Margin="0,0,0,6"
+                                 Text="{Binding Settings.MaxSnapshotMegabytes}" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource RowLabel}"
+                                   Text="{DynamicResource LOCSaveVaultOptMaxSnapshotFiles}" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Style="{StaticResource Num}"
+                                 Text="{Binding Settings.MaxSnapshotFiles}" />
+                    </Grid>
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptSnapshotHint}" Style="{StaticResource Hint}"
+                               Margin="0,8,0,10" />
                 </StackPanel>
             </ScrollViewer>
         </TabItem>

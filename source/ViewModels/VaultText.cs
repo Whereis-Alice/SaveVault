@@ -109,15 +109,7 @@ namespace SaveVault.ViewModels
         /// <summary>string.Format that survives a translation with a broken placeholder.</summary>
         public static string Fill(string key, string fallback, params object[] args)
         {
-            var template = Localization.Get(key, fallback);
-            try
-            {
-                return string.Format(CultureInfo.CurrentCulture, template, args);
-            }
-            catch (FormatException)
-            {
-                return template;
-            }
+            return Localization.Fill(key, fallback, args);
         }
     }
 }

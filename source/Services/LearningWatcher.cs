@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Playnite.SDK;
+using Playnite.SDK.Models;
 using SaveVault.Models;
 
 namespace SaveVault.Services
@@ -13,9 +13,14 @@ namespace SaveVault.Services
     /// Learns save locations by watching what a game actually writes.
     ///
     /// A fingerprint of the user folders is taken when the game starts and compared when it
-    /// stops; anything that changed in between is a save location by definition. This is the
-    /// only layer that works for titles no database has ever heard of, which in a Japanese
-    /// visual novel library is most of them.
+    /// stops. This is the only layer that works for titles no database has ever heard of,
+    /// which in a Japanese visual novel library is most of them.
+    ///
+    /// What changed after 1.0.0: a changed folder is no longer a save location by itself.
+    /// Every other program on the machine writes to AppData while a game is open, so the diff
+    /// also contains the messenger, the driver panel and a couple of Electron caches. Each
+    /// candidate now has to pass <see cref="LearnedGuard" />, which asks it to prove it belongs
+    /// to the game that was running and to stay within the candidate size caps.
     ///
     /// The walk runs on a background thread with hard caps on depth and file count, and it
     /// only stores a path, a size and a timestamp per file, so it stays out of the way of the
@@ -28,27 +33,64 @@ namespace SaveVault.Services
         private const int MaxDepth = 5;
         private const int MaxFiles = 60000;
         private const int MaxChangedFilesPerFolder = 2000;
+        private const int MaxLearnedPerSession = 6;
+        private const int MaxSamplesPerFolder = 512;
 
         private class Session
         {
             public Guid GameId { get; set; }
-            public string InstallDir { get; set; }
+            public string Name { get; set; }
+            public LearnContext Context { get; set; }
             public List<string> Roots { get; set; } = new List<string>();
+            public List<string> Blocked { get; set; } = new List<string>();
             public Dictionary<string, long> Baseline { get; set; }
             public Task Task { get; set; }
             public DateTime StartedUtc { get; set; }
         }
 
+        /// <summary>Changed files below one candidate folder, sampled rather than kept whole.</summary>
+        private class Bucket
+        {
+            public int Count { get; set; }
+            public List<string> Samples { get; } = new List<string>();
+
+            public void Add(string file)
+            {
+                Count++;
+                if (Samples.Count < MaxSamplesPerFolder)
+                {
+                    Samples.Add(file);
+                }
+            }
+        }
+
+        private readonly SaveVaultSettings settings;
         private readonly object gate = new object();
         private readonly Dictionary<Guid, Session> sessions = new Dictionary<Guid, Session>();
 
-        /// <summary>Takes the baseline fingerprint. Returns immediately; the walk is asynchronous.</summary>
-        public void Start(Guid gameId, string installDir)
+        public LearningWatcher(SaveVaultSettings settings)
         {
+            this.settings = settings;
+        }
+
+        /// <summary>
+        /// Takes the baseline fingerprint. Returns immediately; the walk is asynchronous.
+        /// The game is needed in full, not just its id: the title is what a candidate folder
+        /// is later held against.
+        /// </summary>
+        public void Start(Game game)
+        {
+            if (game == null)
+            {
+                return;
+            }
+
+            var installDir = SaveScanner.SafeInstallDir(game);
             var session = new Session
             {
-                GameId = gameId,
-                InstallDir = installDir,
+                GameId = game.Id,
+                Name = game.Name,
+                Context = LearnContext.For(game, settings),
                 StartedUtc = DateTime.UtcNow
             };
 
@@ -65,16 +107,26 @@ namespace SaveVault.Services
                 }
             }
 
+            // Two folders are guaranteed to change during every session and are never a save:
+            // the vault itself and Playnite's configuration. Skipping them keeps the walk
+            // cheaper as well.
+            session.Blocked.Add(session.Context.VaultRoot);
+            session.Blocked.Add(LearnedGuard.PlayniteConfigFolder());
+            session.Blocked = session.Blocked
+                .Where(b => !string.IsNullOrWhiteSpace(b))
+                .Select(b => b.TrimEnd('\\'))
+                .ToList();
+
             lock (gate)
             {
-                sessions[gameId] = session;
+                sessions[game.Id] = session;
             }
 
             session.Task = Task.Factory.StartNew(() =>
             {
                 try
                 {
-                    var map = Fingerprint(session.Roots);
+                    var map = Fingerprint(session);
                     session.Baseline = map;
                     logger.Debug("Save Vault: learning baseline has " + map.Count + " files.");
                 }
@@ -124,7 +176,7 @@ namespace SaveVault.Services
             Dictionary<string, long> after;
             try
             {
-                after = Fingerprint(session.Roots);
+                after = Fingerprint(session);
             }
             catch (Exception e)
             {
@@ -170,10 +222,11 @@ namespace SaveVault.Services
         /// Reduces a list of changed files to a short list of folders worth backing up. A
         /// folder whose name means "saves" wins; otherwise the folder two levels below the
         /// watch root is used, which is the vendor\title layout nearly every engine follows.
+        /// Whatever comes out of that still has to convince <see cref="LearnedGuard" />.
         /// </summary>
         private static List<SaveTarget> Anchors(Session session, List<string> changed)
         {
-            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var buckets = new Dictionary<string, Bucket>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var file in changed)
             {
@@ -193,15 +246,22 @@ namespace SaveVault.Services
                     continue;
                 }
 
-                int current;
-                counts[anchor] = counts.TryGetValue(anchor, out current) ? current + 1 : 1;
+                Bucket bucket;
+                if (!buckets.TryGetValue(anchor, out bucket))
+                {
+                    bucket = new Bucket();
+                    buckets[anchor] = bucket;
+                }
+
+                bucket.Add(file);
             }
 
             var result = new List<SaveTarget>();
+            var rejected = 0;
 
-            foreach (var pair in counts.OrderByDescending(p => p.Value))
+            foreach (var pair in buckets.OrderByDescending(p => p.Value.Count))
             {
-                if (pair.Value > MaxChangedFilesPerFolder)
+                if (pair.Value.Count > MaxChangedFilesPerFolder)
                 {
                     // Thousands of touched files is a cache, not a save.
                     logger.Debug("Save Vault: ignoring busy folder " + pair.Key);
@@ -214,6 +274,14 @@ namespace SaveVault.Services
                     continue;
                 }
 
+                string reason;
+                if (!LearnedGuard.PlausibleObserved(pair.Key, session.Context, pair.Value.Samples, out reason))
+                {
+                    rejected++;
+                    logger.Debug("Save Vault: not learning " + pair.Key + " for " + session.Name + " (" + reason + ").");
+                    continue;
+                }
+
                 result.Add(new SaveTarget
                 {
                     Kind = TargetKind.Folder,
@@ -223,10 +291,15 @@ namespace SaveVault.Services
                     Note = "observed"
                 });
 
-                if (result.Count >= 6)
+                if (result.Count >= MaxLearnedPerSession)
                 {
                     break;
                 }
+            }
+
+            if (rejected > 0)
+            {
+                logger.Info("Save Vault: " + rejected + " observed folder(s) did not belong to " + session.Name + ".");
             }
 
             return result;
@@ -268,14 +341,14 @@ namespace SaveVault.Services
         /// stays compact: sizes rarely collide with write times in practice, and a false
         /// negative here only costs one missed detection.
         /// </summary>
-        private static Dictionary<string, long> Fingerprint(List<string> roots)
+        private static Dictionary<string, long> Fingerprint(Session session)
         {
             var map = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
             var budget = MaxFiles;
 
-            foreach (var root in roots)
+            foreach (var root in session.Roots)
             {
-                Walk(root, 0, map, ref budget);
+                Walk(root, 0, map, ref budget, session.Blocked);
                 if (budget <= 0)
                 {
                     logger.Warn("Save Vault: learning walk hit the file budget.");
@@ -286,9 +359,14 @@ namespace SaveVault.Services
             return map;
         }
 
-        private static void Walk(string folder, int depth, Dictionary<string, long> map, ref int budget)
+        private static void Walk(string folder, int depth, Dictionary<string, long> map, ref int budget, List<string> blocked)
         {
             if (depth > MaxDepth || budget <= 0)
+            {
+                return;
+            }
+
+            if (blocked.Any(b => string.Equals(folder.TrimEnd('\\'), b, StringComparison.OrdinalIgnoreCase)))
             {
                 return;
             }
@@ -335,7 +413,7 @@ namespace SaveVault.Services
                     continue;
                 }
 
-                Walk(child, depth + 1, map, ref budget);
+                Walk(child, depth + 1, map, ref budget, blocked);
                 if (budget <= 0)
                 {
                     return;

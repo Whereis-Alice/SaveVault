@@ -226,6 +226,15 @@ namespace SaveVault.Models
         public bool Unchanged { get; set; }
         public bool NoTargets { get; set; }
         public bool Skipped { get; set; }
+
+        /// <summary>Set when the sources are larger than the per snapshot budget, so nothing was written.</summary>
+        public bool TooLarge { get; set; }
+
+        /// <summary>Measured size of the sources, filled in whether or not a snapshot was written.</summary>
+        public long SourceBytes { get; set; }
+
+        /// <summary>Measured number of source files.</summary>
+        public int SourceFiles { get; set; }
         public string Error { get; set; }
         public SnapshotRecord Snapshot { get; set; }
         public string GameName { get; set; }

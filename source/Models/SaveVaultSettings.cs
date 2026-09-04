@@ -33,9 +33,12 @@ namespace SaveVault.Models
         private bool scanUserFolders = true;
         private int maxCandidateMegabytes = 256;
         private int maxCandidateFiles = 5000;
+        private int maxSnapshotMegabytes = 512;
+        private int maxSnapshotFiles = 20000;
         private bool autoScanNewGames = true;
 
         private DateTime? lastScheduledRunUtc;
+        private int learnedGuardVersion;
 
         /// <summary>
         /// Default vault location. Deliberately not under the user profile: save archives
@@ -199,6 +202,29 @@ namespace SaveVault.Models
             set { SetValue(ref maxCandidateFiles, value); }
         }
 
+        /// <summary>
+        /// Largest snapshot that may be written, in megabytes. 0 removes the limit.
+        ///
+        /// The vault has a total budget, and a single game whose save folder is measured in
+        /// gigabytes (world files, screenshot folders, an engine that keeps its cache next to the
+        /// saves) would eat all of it and starve every other game. Refusing such a snapshot and
+        /// saying so is more useful than silently filling the vault.
+        /// </summary>
+        [SerializationPropertyName("maxSnapshotMegabytes")]
+        public int MaxSnapshotMegabytes
+        {
+            get { return maxSnapshotMegabytes; }
+            set { SetValue(ref maxSnapshotMegabytes, value); }
+        }
+
+        /// <summary>Largest number of files a snapshot may contain. 0 removes the limit.</summary>
+        [SerializationPropertyName("maxSnapshotFiles")]
+        public int MaxSnapshotFiles
+        {
+            get { return maxSnapshotFiles; }
+            set { SetValue(ref maxSnapshotFiles, value); }
+        }
+
         /// <summary>Detect targets the first time a game is played or backed up.</summary>
         [SerializationPropertyName("autoScanNewGames")]
         public bool AutoScanNewGames
@@ -212,6 +238,19 @@ namespace SaveVault.Models
         {
             get { return lastScheduledRunUtc; }
             set { SetValue(ref lastScheduledRunUtc, value); }
+        }
+
+        /// <summary>
+        /// Version of the plausibility rules that were last applied to stored learned
+        /// locations. Bumping <see cref="SaveVault.Services.LearnedGuard.Version"/> makes the
+        /// plugin re-check everything it learned before the rules were tightened, which is the
+        /// only way to clean up bad records without asking the user to hunt for them.
+        /// </summary>
+        [SerializationPropertyName("learnedGuardVersion")]
+        public int LearnedGuardVersion
+        {
+            get { return learnedGuardVersion; }
+            set { SetValue(ref learnedGuardVersion, value); }
         }
 
         /// <summary>Effective vault root, falling back to the default when cleared.</summary>
@@ -254,9 +293,12 @@ namespace SaveVault.Models
             ScanUserFolders = other.ScanUserFolders;
             MaxCandidateMegabytes = other.MaxCandidateMegabytes;
             MaxCandidateFiles = other.MaxCandidateFiles;
+            MaxSnapshotMegabytes = other.MaxSnapshotMegabytes;
+            MaxSnapshotFiles = other.MaxSnapshotFiles;
             AutoScanNewGames = other.AutoScanNewGames;
 
             LastScheduledRunUtc = other.LastScheduledRunUtc;
+            LearnedGuardVersion = other.LearnedGuardVersion;
         }
     }
 }

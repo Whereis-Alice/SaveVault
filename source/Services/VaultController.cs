@@ -255,6 +255,18 @@ namespace SaveVault.Services
                 return;
             }
 
+            if (result.TooLarge)
+            {
+                Info(Localization.Fill("LOCSaveVaultTooLarge",
+                        "The save location of this game holds {0}, more than the per snapshot limit of {1}. Nothing was written.",
+                        FormatSize(result.SourceBytes) + " / " + result.SourceFiles + " " +
+                            Localization.Get("LOCSaveVaultFilesWord", "files"),
+                        FormatSize((long)settings.MaxSnapshotMegabytes * 1024L * 1024L)) + "\n\n" +
+                     Localization.Get("LOCSaveVaultTooLargeHint",
+                        "Remove the location that is too big in the manager, narrow it with a file filter, or raise the limit in the settings."));
+                return;
+            }
+
             if (result.Unchanged)
             {
                 Info(Localization.Get("LOCSaveVaultUnchanged", "Saves are unchanged since the last snapshot."));
@@ -274,6 +286,7 @@ namespace SaveVault.Services
             var unchanged = 0;
             var empty = 0;
             var failed = 0;
+            var oversized = 0;
 
             RunWithProgress(Localization.Get("LOCSaveVaultProgressBackupAll", "Backing up the whole library"),
                 progress =>
@@ -313,6 +326,10 @@ namespace SaveVault.Services
                         {
                             failed++;
                         }
+                        else if (result.TooLarge)
+                        {
+                            oversized++;
+                        }
                     }
                 });
 
@@ -320,7 +337,9 @@ namespace SaveVault.Services
                  Localization.Get("LOCSaveVaultStatCreated", "New snapshots:") + " " + created + "\n" +
                  Localization.Get("LOCSaveVaultStatUnchanged", "Unchanged:") + " " + unchanged + "\n" +
                  Localization.Get("LOCSaveVaultStatNoTargets", "No known location:") + " " + empty +
-                 (failed > 0 ? "\n" + Localization.Get("LOCSaveVaultStatFailed", "Failed:") + " " + failed : string.Empty));
+                 (oversized > 0 ? "\n" + Localization.Get("LOCSaveVaultStatOversized", "Too large:") + " " + oversized : string.Empty) +
+                 (failed > 0 ? "\n" + Localization.Get("LOCSaveVaultStatFailed", "Failed:") + " " + failed : string.Empty) +
+                 QuotaHint());
         }
 
         /// <summary>
@@ -331,6 +350,8 @@ namespace SaveVault.Services
         {
             var games = api.Database.Games.Where(g => !g.Hidden).ToList();
             var created = 0;
+
+            var oversized = new List<string>();
 
             foreach (var game in games)
             {
@@ -345,6 +366,22 @@ namespace SaveVault.Services
                 {
                     created++;
                 }
+                else if (result.TooLarge)
+                {
+                    oversized.Add(profile.Name);
+                }
+            }
+
+            // A skipped game is actionable, so it is reported even when backup notifications are
+            // off: silently never backing something up is exactly the failure this plugin exists
+            // to prevent.
+            if (oversized.Count > 0)
+            {
+                Notify("SaveVaultOversized",
+                    Localization.Fill("LOCSaveVaultOversizedNotice",
+                        "{0} games were skipped because their save location is over the per snapshot limit: {1}",
+                        oversized.Count, string.Join(", ", oversized.Take(5))),
+                    NotificationType.Error);
             }
 
             settings.LastScheduledRunUtc = DateTime.UtcNow;
@@ -487,7 +524,271 @@ namespace SaveVault.Services
             var after = store.TotalBytes();
             Info(Localization.Get("LOCSaveVaultPruneDone", "Retention applied.") + "\n" +
                  Localization.Get("LOCSaveVaultPruneFreed", "Reclaimed:") + " " + FormatSize(Math.Max(0, before - after)) + "\n" +
-                 Localization.Get("LOCSaveVaultVaultSize", "Vault size:") + " " + FormatSize(after));
+                 Localization.Get("LOCSaveVaultVaultSize", "Vault size:") + " " + FormatSize(after) +
+                 QuotaHint());
+        }
+
+        /// <summary>
+        /// Re-checks every stored "learned during play" location against the current
+        /// plausibility rules and drops the ones that cannot belong to their game.
+        ///
+        /// Only learned folder targets are examined. Manual entries are the user's word and are
+        /// never touched, and the scanner based origins are re-derived by a normal detection run
+        /// anyway. A profile whose game is no longer in the library is skipped rather than
+        /// cleaned: without the game there is no title to match against, and guessing would
+        /// delete the very records that are hardest to recreate.
+        /// </summary>
+        /// <param name="dropped">
+        /// Optional sink that receives every removed target as game id and path, so a caller can
+        /// work out which snapshots were built from data that is no longer trusted.
+        /// </param>
+        /// <returns>Number of targets removed.</returns>
+        public int PurgeImplausibleLearned(List<KeyValuePair<Guid, string>> dropped = null)
+        {
+            var removed = 0;
+
+            lock (workGate)
+            {
+                foreach (var profile in store.Profiles())
+                {
+                    if (profile == null || profile.Targets == null || profile.Targets.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    // Nested duplicates are removable without knowing anything about the game.
+                    var nested = profile.Targets
+                        .Where(t => t != null && t.Kind == TargetKind.Folder)
+                        .Select(t => t.Path)
+                        .ToList();
+
+                    if (SaveScanner.Collapse(profile) > 0)
+                    {
+                        foreach (var path in nested.Where(x => !profile.Targets.Any(t => t.Path == x)))
+                        {
+                            removed++;
+                            if (dropped != null)
+                            {
+                                dropped.Add(new KeyValuePair<Guid, string>(profile.GameId, path));
+                            }
+                        }
+                    }
+
+                    var suspects = profile.Targets
+                        .Where(t => t != null && t.Origin == TargetOrigin.Learned && t.Kind == TargetKind.Folder)
+                        .ToList();
+
+                    if (suspects.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    var game = api == null || api.Database == null ? null : api.Database.Games.Get(profile.GameId);
+                    if (game == null)
+                    {
+                        logger.Debug("Save Vault: keeping learned locations of " + profile.Name + ", the game is gone from the library.");
+                        continue;
+                    }
+
+                    var context = LearnContext.For(game, settings);
+
+                    foreach (var target in suspects)
+                    {
+                        string reason;
+                        if (LearnedGuard.Plausible(target.Path, context, out reason))
+                        {
+                            continue;
+                        }
+
+                        profile.Targets.Remove(target);
+                        removed++;
+
+                        if (dropped != null)
+                        {
+                            dropped.Add(new KeyValuePair<Guid, string>(profile.GameId, target.Path));
+                        }
+
+                        logger.Info("Save Vault: dropped learned location " + target.Path + " from " + profile.Name + " (" + reason + ").");
+                    }
+                }
+
+                if (removed > 0)
+                {
+                    store.Save();
+                }
+            }
+
+            if (removed > 0)
+            {
+                RaiseChanged();
+            }
+
+            return removed;
+        }
+
+        /// <summary>
+        /// Menu entry for <see cref="PurgeImplausibleLearned"/>: purges the bad locations, then
+        /// offers to delete the snapshots that were built from them.
+        ///
+        /// The two halves are deliberately separate decisions. A target is metadata and can be
+        /// found again by another scan, so it is removed without asking; a snapshot is the only
+        /// copy of something and is never deleted without a yes.
+        /// </summary>
+        public void PurgeLearnedInteractive()
+        {
+            var removed = 0;
+            var dropped = new List<KeyValuePair<Guid, string>>();
+
+            RunWithProgress(Localization.Get("LOCSaveVaultProgressPurgeLearned", "Re-checking learned locations"),
+                () => { removed = PurgeImplausibleLearned(dropped); });
+
+            var message = Localization.Get("LOCSaveVaultPurgeDone", "Check complete.") + "\n" +
+                          Localization.Get("LOCSaveVaultPurgeRemoved", "Removed:") + " " + removed;
+
+            var tainted = Tainted();
+            if (tainted.Count == 0)
+            {
+                Info(message + QuotaHint());
+                return;
+            }
+
+            var bytes = tainted.Sum(t => t.Item2.Bytes);
+            var onlyCopy = tainted.Count(t => t.Item1.Snapshots.Count == 1);
+
+            var ask = message + "\n\n" +
+                      Localization.Fill("LOCSaveVaultPurgeTainted",
+                          "{0} snapshots contain data copied from those locations, taking {1}. Delete them?",
+                          tainted.Count, FormatSize(bytes)) +
+                      (onlyCopy == 0
+                          ? string.Empty
+                          : "\n" + Localization.Fill("LOCSaveVaultPurgeTaintedOnly",
+                                "{0} of them are the only snapshot their game has. A fresh backup is taken right after, using the locations that are left.",
+                                onlyCopy));
+
+            if (api == null || api.Dialogs == null ||
+                api.Dialogs.ShowMessage(ask, Name(), System.Windows.MessageBoxButton.YesNo) !=
+                    System.Windows.MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            var freed = 0L;
+            var again = new List<Guid>();
+
+            RunWithProgress(Localization.Get("LOCSaveVaultProgressPurgeLearned", "Re-checking learned locations"),
+                () =>
+                {
+                    lock (workGate)
+                    {
+                        foreach (var item in tainted)
+                        {
+                            var size = item.Item2.Bytes;
+                            if (!snapshots.Delete(item.Item1, item.Item2))
+                            {
+                                continue;
+                            }
+
+                            freed += size;
+
+                            if (item.Item1.HasTargets && !again.Contains(item.Item1.GameId))
+                            {
+                                again.Add(item.Item1.GameId);
+                            }
+                        }
+
+                        store.Save();
+                    }
+                });
+
+            // A clean snapshot immediately afterwards, so a game does not sit unprotected just
+            // because its only backup happened to be junk.
+            foreach (var id in again)
+            {
+                var game = api.Database.Games.Get(id);
+                if (game != null)
+                {
+                    Backup(game, SnapshotTrigger.Manual, true);
+                }
+            }
+
+            RaiseChanged();
+
+            Info(Localization.Get("LOCSaveVaultPurgeDone", "Check complete.") + "\n" +
+                 Localization.Get("LOCSaveVaultPruneFreed", "Reclaimed:") + " " + FormatSize(freed) + "\n" +
+                 Localization.Get("LOCSaveVaultVaultSize", "Vault size:") + " " + FormatSize(store.TotalBytes()) +
+                 QuotaHint());
+        }
+
+        /// <summary>
+        /// Snapshots whose sources include a learned path that no longer passes the rules.
+        ///
+        /// Deliberately independent of the purge that just ran. The silent check at startup
+        /// removes the bad locations on its own, so by the time somebody opens the menu entry
+        /// there is nothing left to drop, while the oversized snapshots those locations produced
+        /// are still on disk. Reading the snapshot's own recorded sources finds them either way.
+        /// </summary>
+        private List<Tuple<GameSaveProfile, SnapshotRecord>> Tainted()
+        {
+            var result = new List<Tuple<GameSaveProfile, SnapshotRecord>>();
+
+            foreach (var profile in store.Profiles())
+            {
+                if (profile == null || profile.Snapshots == null || profile.Snapshots.Count == 0)
+                {
+                    continue;
+                }
+
+                var game = api == null || api.Database == null ? null : api.Database.Games.Get(profile.GameId);
+                if (game == null)
+                {
+                    // No game means no way to tell a save folder from a stranger, so keep the data.
+                    continue;
+                }
+
+                var context = LearnContext.For(game, settings);
+                var kept = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                if (profile.Targets != null)
+                {
+                    foreach (var target in profile.Targets)
+                    {
+                        if (target != null && target.Kind == TargetKind.Folder)
+                        {
+                            kept.Add(SaveTarget.Normalize(target.Path));
+                        }
+                    }
+                }
+
+                foreach (var snapshot in profile.Snapshots.ToList())
+                {
+                    if (snapshot.Sources == null || snapshot.Sources.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    foreach (var source in snapshot.Sources)
+                    {
+                        if (source == null || source.Kind != TargetKind.Folder ||
+                            source.Origin != TargetOrigin.Learned ||
+                            string.IsNullOrWhiteSpace(source.Path) ||
+                            kept.Contains(SaveTarget.Normalize(source.Path)))
+                        {
+                            continue;
+                        }
+
+                        string reason;
+                        if (LearnedGuard.Plausible(source.Path, context, out reason))
+                        {
+                            continue;
+                        }
+
+                        result.Add(Tuple.Create(profile, snapshot));
+                        break;
+                    }
+                }
+            }
+
+            return result;
         }
 
         public void OpenVaultFolder(GameSaveProfile profile)
@@ -534,6 +835,34 @@ namespace SaveVault.Services
         }
 
         // ---------------------------------------------------------------------- helpers
+
+        /// <summary>
+        /// Extra line for a summary dialog when the vault is over its size budget.
+        ///
+        /// Retention refuses to delete the only snapshot a game owns, so a library where many
+        /// games hold one large snapshot each stays over the limit no matter how often pruning
+        /// runs. Naming the biggest games turns a silent overrun into something the user can fix.
+        /// </summary>
+        private string QuotaHint()
+        {
+            var overflow = snapshots.Overflow();
+            if (overflow <= 0)
+            {
+                return string.Empty;
+            }
+
+            var biggest = snapshots.Largest(3)
+                .Select(p => p.Key + " (" + FormatSize(p.Value) + ")")
+                .ToList();
+
+            return "\n\n" + Localization.Fill("LOCSaveVaultQuotaOver",
+                       "The vault is {0} over the {1} budget. Retention keeps the only snapshot of every game, so the rest has to go by hand.",
+                       FormatSize(overflow),
+                       FormatSize((long)settings.MaxTotalMegabytes * 1024L * 1024L)) +
+                   (biggest.Count == 0
+                       ? string.Empty
+                       : "\n" + Localization.Get("LOCSaveVaultQuotaBiggest", "Largest:") + " " + string.Join(", ", biggest));
+        }
 
         /// <summary>Human readable byte count, used everywhere a size is shown.</summary>
         public static string FormatSize(long bytes)

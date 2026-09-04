@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Markup;
@@ -109,6 +110,25 @@ namespace SaveVault
             }
 
             return fallback ?? key;
+        }
+
+        /// <summary>
+        /// string.Format on a localized template, tolerating a translation whose placeholders
+        /// were mistyped: a broken string still shows the sentence instead of throwing inside a
+        /// background task.
+        /// </summary>
+        public static string Fill(string key, string fallback, params object[] args)
+        {
+            var template = Get(key, fallback);
+
+            try
+            {
+                return string.Format(CultureInfo.CurrentCulture, template, args);
+            }
+            catch (FormatException)
+            {
+                return template;
+            }
         }
     }
 }

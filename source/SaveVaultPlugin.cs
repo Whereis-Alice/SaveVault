@@ -31,7 +31,7 @@ namespace SaveVault
         private readonly VaultStore store;
         private readonly VaultController controller;
         private readonly SettingsViewModel settingsModel;
-        private readonly LearningWatcher learning = new LearningWatcher();
+        private readonly LearningWatcher learning;
         private readonly Scheduler scheduler;
 
         private GameVaultViewModel panel;
@@ -49,6 +49,7 @@ namespace SaveVault
             store = new VaultStore(() => settings.EffectiveBackupRoot);
             controller = new VaultController(api, settings, store);
             settingsModel = new SettingsViewModel(settings, controller, api, () => SavePluginSettings(settings));
+            learning = new LearningWatcher(settings);
             scheduler = new Scheduler(RunScheduled);
 
             Properties = new GenericPluginProperties { HasSettings = true };
@@ -127,6 +128,35 @@ namespace SaveVault
                 logger.Error(e, "Save Vault: could not reconcile the vault folder.");
             }
 
+            // One time cleanup after the plausibility rules were tightened. Version 1.0.0 learned
+            // any folder that changed while a game was running, so libraries carry records that
+            // point at messengers and driver panels; they have to go before the next backup copies
+            // them again. Off the startup thread because it walks folders to measure them.
+            if (settings.LearnedGuardVersion < LearnedGuard.Version)
+            {
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        var dropped = controller.PurgeImplausibleLearned();
+                        settings.LearnedGuardVersion = LearnedGuard.Version;
+                        SavePluginSettings(settings);
+
+                        if (dropped > 0)
+                        {
+                            controller.Notify("savevault-purge",
+                                Localization.Fill("LOCSaveVaultPurgeNotice",
+                                    "Save Vault removed {0} save locations that were recorded by mistake.", dropped),
+                                NotificationType.Info);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        logger.Error(e, "Save Vault: could not re-check learned locations.");
+                    }
+                });
+            }
+
             scheduler.Start();
         }
 
@@ -191,7 +221,7 @@ namespace SaveVault
 
             // Baseline now, diff on exit: the folders a game writes while running are the only
             // reliable signal for the many titles no manifest and no heuristic will ever cover.
-            learning.Start(game.Id, SaveScanner.SafeInstallDir(game));
+            learning.Start(game);
         }
 
         public override void OnGameStopped(OnGameStoppedEventArgs args)
@@ -397,6 +427,13 @@ namespace SaveVault
                 MenuSection = section,
                 Description = Localization.Get("LOCSaveVaultMenuPrune", "Apply the retention policy"),
                 Action = context => controller.PruneInteractive()
+            };
+
+            yield return new MainMenuItem
+            {
+                MenuSection = section,
+                Description = Localization.Get("LOCSaveVaultMenuPurgeLearned", "Re-check learned locations"),
+                Action = context => controller.PurgeLearnedInteractive()
             };
         }
 

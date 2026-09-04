@@ -57,6 +57,7 @@
     <sys:String x:Key="LOCSaveVaultMenuManage">Open Save Vault…</sys:String>
     <sys:String x:Key="LOCSaveVaultMenuOpenFolder">Open the backup folder</sys:String>
     <sys:String x:Key="LOCSaveVaultMenuPrune">Apply the retention policy</sys:String>
+    <sys:String x:Key="LOCSaveVaultMenuPurgeLearned">Re-check learned locations</sys:String>
     <sys:String x:Key="LOCSaveVaultMissingMark">missing</sys:String>
     <sys:String x:Key="LOCSaveVaultName">Save Vault</sys:String>
     <sys:String x:Key="LOCSaveVaultNoTargets">No save location is known for this game yet. Run detection, play it once with learning enabled, or add a path by hand.</sys:String>
@@ -79,6 +80,8 @@
     <sys:String x:Key="LOCSaveVaultOptManifestPathHint">Leave empty to use Ludusavi's default manifest location. The file is only read; Ludusavi is never launched.</sys:String>
     <sys:String x:Key="LOCSaveVaultOptMaxCandidateFiles">Largest folder to accept, in files</sys:String>
     <sys:String x:Key="LOCSaveVaultOptMaxCandidateSize">Largest folder to accept</sys:String>
+    <sys:String x:Key="LOCSaveVaultOptMaxSnapshotFiles">Largest snapshot to write, in files</sys:String>
+    <sys:String x:Key="LOCSaveVaultOptMaxSnapshotSize">Largest snapshot to write</sys:String>
     <sys:String x:Key="LOCSaveVaultOptMaxSnapshots">Snapshots per game</sys:String>
     <sys:String x:Key="LOCSaveVaultOptMaxTotal">Total size limit</sys:String>
     <sys:String x:Key="LOCSaveVaultOptNotify">Show a notification after each backup</sys:String>
@@ -92,6 +95,7 @@
     <sys:String x:Key="LOCSaveVaultOptScheduleInterval">Interval</sys:String>
     <sys:String x:Key="LOCSaveVaultOptScheduled">Back up on a schedule</sys:String>
     <sys:String x:Key="LOCSaveVaultOptScheduledHint">Checks once per interval while Playnite is running. Only games whose saves changed get a new snapshot.</sys:String>
+    <sys:String x:Key="LOCSaveVaultOptSnapshotHint">A game whose save location is bigger than this is skipped and reported instead of eating the whole vault budget. 0 removes the limit.</sys:String>
     <sys:String x:Key="LOCSaveVaultOptUseLudusavi">Use the Ludusavi manifest</sys:String>
     <sys:String x:Key="LOCSaveVaultOptUseLudusaviHint">Reads Ludusavi's save-path database as one more hint. Ludusavi itself is not required, and Japanese niche titles are usually missing from it.</sys:String>
     <sys:String x:Key="LOCSaveVaultOriginInstallFolder">Install folder</sys:String>
@@ -100,15 +104,24 @@
     <sys:String x:Key="LOCSaveVaultOriginManual">Added by hand</sys:String>
     <sys:String x:Key="LOCSaveVaultOriginRegistryGuess">Registry guess</sys:String>
     <sys:String x:Key="LOCSaveVaultOriginUserFolder">User folder</sys:String>
+    <sys:String x:Key="LOCSaveVaultOversizedNotice">{0} games were skipped because their save location is over the per snapshot limit: {1}</sys:String>
     <sys:String x:Key="LOCSaveVaultPickGame">Pick a game on the left.</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressBackup">Backing up</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressBackupAll">Backing up the whole library</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressDetect">Looking for save locations</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressDetectAll">Looking for save locations in the whole library</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressPrune">Applying retention rules</sys:String>
+    <sys:String x:Key="LOCSaveVaultProgressPurgeLearned">Re-checking learned locations</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressRestore">Restoring</sys:String>
     <sys:String x:Key="LOCSaveVaultPruneDone">Retention applied.</sys:String>
     <sys:String x:Key="LOCSaveVaultPruneFreed">Reclaimed:</sys:String>
+    <sys:String x:Key="LOCSaveVaultPurgeDone">Check complete.</sys:String>
+    <sys:String x:Key="LOCSaveVaultPurgeNotice">Save Vault removed {0} save locations that were recorded by mistake.</sys:String>
+    <sys:String x:Key="LOCSaveVaultPurgeRemoved">Removed:</sys:String>
+    <sys:String x:Key="LOCSaveVaultPurgeTainted">{0} snapshots contain data copied from those locations, taking {1}. Delete them?</sys:String>
+    <sys:String x:Key="LOCSaveVaultPurgeTaintedOnly">{0} of them are the only snapshot their game has. A fresh backup is taken right after, using the locations that are left.</sys:String>
+    <sys:String x:Key="LOCSaveVaultQuotaBiggest">Largest:</sys:String>
+    <sys:String x:Key="LOCSaveVaultQuotaOver">The vault is {0} over the {1} budget. Retention keeps the only snapshot of every game, so the rest has to go by hand.</sys:String>
     <sys:String x:Key="LOCSaveVaultRegistryWord">registry keys</sys:String>
     <sys:String x:Key="LOCSaveVaultRemoveTargetConfirm">Remove this location? Existing snapshots are kept.</sys:String>
     <sys:String x:Key="LOCSaveVaultRestoreConfirm">Overwrite the current saves with this snapshot?</sys:String>
@@ -123,6 +136,7 @@
     <sys:String x:Key="LOCSaveVaultSettingsDetectIntro">Sources are merged from most to least trusted: added by hand, learned while playing, Ludusavi manifest, install folder, user folder, registry guess.</sys:String>
     <sys:String x:Key="LOCSaveVaultSettingsLimits">Candidate limits</sys:String>
     <sys:String x:Key="LOCSaveVaultSettingsRetention">Retention</sys:String>
+    <sys:String x:Key="LOCSaveVaultSettingsSnapshotLimits">Snapshot limits</sys:String>
     <sys:String x:Key="LOCSaveVaultSettingsWhen">When to back up</sys:String>
     <sys:String x:Key="LOCSaveVaultShowAll">Show all {0} snapshots</sys:String>
     <sys:String x:Key="LOCSaveVaultSnapshotsCaption">Snapshots</sys:String>
@@ -130,6 +144,7 @@
     <sys:String x:Key="LOCSaveVaultStatCreated">New snapshots:</sys:String>
     <sys:String x:Key="LOCSaveVaultStatFailed">Failed:</sys:String>
     <sys:String x:Key="LOCSaveVaultStatNoTargets">No known location:</sys:String>
+    <sys:String x:Key="LOCSaveVaultStatOversized">Too large:</sys:String>
     <sys:String x:Key="LOCSaveVaultStatUnchanged">Unchanged:</sys:String>
     <sys:String x:Key="LOCSaveVaultStats">{0} games, {1} snapshots, {2} used.</sys:String>
     <sys:String x:Key="LOCSaveVaultStatusNoGame">No game selected.</sys:String>
@@ -140,6 +155,8 @@
     <sys:String x:Key="LOCSaveVaultTargetEnabledHint">Include this location in backups</sys:String>
     <sys:String x:Key="LOCSaveVaultTargetExists">That location is already known.</sys:String>
     <sys:String x:Key="LOCSaveVaultTargetsCaption">Save locations</sys:String>
+    <sys:String x:Key="LOCSaveVaultTooLarge">The save location of this game holds {0}, more than the per snapshot limit of {1}. Nothing was written.</sys:String>
+    <sys:String x:Key="LOCSaveVaultTooLargeHint">Remove the location that is too big in the manager, narrow it with a file filter, or raise the limit in the settings.</sys:String>
     <sys:String x:Key="LOCSaveVaultTotals">{0} games · {1} snapshots · {2} of {3}</sys:String>
     <sys:String x:Key="LOCSaveVaultTriggerBeforeLaunch">Before launch</sys:String>
     <sys:String x:Key="LOCSaveVaultTriggerBeforeRestore">Undo point</sys:String>

@@ -149,6 +149,28 @@ namespace SaveVault.Services
                     return result;
                 }
 
+                foreach (var item in plan)
+                {
+                    result.SourceFiles += item.Files.Count;
+                    result.SourceBytes += item.Files.Sum(f => f.Length);
+                }
+
+                // Measured before anything is written: a folder that only looks like a save
+                // location can be enormous, and the honest answer is to refuse it rather than
+                // spend the whole vault budget on one game. The caps are settings, so a game with
+                // genuinely huge saves is one number away from being backed up.
+                var byteCap = (long)Math.Max(0, settings.MaxSnapshotMegabytes) * 1024L * 1024L;
+                var fileCap = Math.Max(0, settings.MaxSnapshotFiles);
+
+                if ((byteCap > 0 && result.SourceBytes > byteCap) ||
+                    (fileCap > 0 && result.SourceFiles > fileCap))
+                {
+                    result.TooLarge = true;
+                    logger.Warn("Save Vault: skipped " + profile.Name + ", sources are " + result.SourceFiles +
+                                " files / " + result.SourceBytes + " bytes, over the per snapshot budget.");
+                    return result;
+                }
+
                 var hash = ComputeHash(plan);
                 if (!force && string.Equals(hash, profile.LastHash, StringComparison.OrdinalIgnoreCase) &&
                     profile.Snapshots.Count > 0)
@@ -720,6 +742,30 @@ namespace SaveVault.Services
             }
 
             return freed;
+        }
+
+        /// <summary>
+        /// How far the vault is over its budget, in bytes, or 0 when it fits.
+        ///
+        /// Worth reporting because the quota cannot always be met: the pruner refuses to delete
+        /// the only snapshot a game has, so a library of many games each holding one large
+        /// snapshot legitimately stays over the limit. Saying so beats pretending.
+        /// </summary>
+        public long Overflow()
+        {
+            var cap = (long)Math.Max(64, settings.MaxTotalMegabytes) * 1024L * 1024L;
+            return Math.Max(0, store.TotalBytes() - cap);
+        }
+
+        /// <summary>The games taking the most room, largest first, for a hint the user can act on.</summary>
+        public List<KeyValuePair<string, long>> Largest(int count)
+        {
+            return store.Profiles()
+                .Select(p => new KeyValuePair<string, long>(p.Name, p.Snapshots.Sum(s => s.Bytes)))
+                .Where(p => p.Value > 0)
+                .OrderByDescending(p => p.Value)
+                .Take(Math.Max(1, count))
+                .ToList();
         }
 
         /// <summary>Removes a snapshot from disk and from the index.</summary>

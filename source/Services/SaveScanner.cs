@@ -27,6 +27,32 @@ namespace SaveVault.Services
         };
 
         /// <summary>
+        /// Folders that belong to an application rather than a game.
+        ///
+        /// Only the learning layer consults this list. A normal scan matches folder names
+        /// against the title, so it never looks at these, but runtime observation sees every
+        /// program that wrote something while the game was open: a messenger, a driver panel,
+        /// an Electron shell. Version 1.0.0 recorded exactly those as save locations.
+        /// </summary>
+        private static readonly HashSet<string> applications = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "qq", "qqex", "tim", "tencent", "tencentqq", "wechat", "weixin", "wechatfiles", "wxwork",
+            "lenovo", "ludp", "codex", "astrbot", "ebwebview", "webview2", "microsoftedgewebview2",
+            "crashpad", "code cache", "dawncache", "partitions", "nvidia corporation", "nvidia app",
+            "geforce experience", "nvidia gfexperience", "adobe", "jetbrains", "programs", "python",
+            "anaconda3", "miniconda3", "nodejs", "npm", "npm-cache", "yarn", "pnpm", "docker",
+            "chrome", "chromium", "edge", "firefox", "opera", "opera software", "brave", "vivaldi",
+            "vscode", "code", "cursor", "sublime text", "notepad++", "obsidian", "notion", "typora",
+            "slack", "zoom", "teams", "skype", "telegram desktop", "feishu", "dingtalk", "bytedance",
+            "netease", "baidu", "kingsoft", "wps", "wpsoffice", "xunlei", "thunder", "bilibili",
+            "obs-studio", "everything", "listary", "utorrent", "qbittorrent", "aria2",
+            "vmware", "virtualbox", "wireshark", "git", "github", "unity", "unityhub", "unrealengine",
+            "office", "outlook", "onenote", "onedrive", "dropbox", "google drive",
+            "battle.net", "epicgameslauncher", "riot games", "uplay", "ubisoft", "ubisoft game launcher",
+            "ea desktop", "origin", "gog.com", "goggalaxy", "steamwebhelper", "itch"
+        };
+
+        /// <summary>
         /// True for folders that are never a save location. Besides the known names, anything
         /// starting with a dot, an underscore, a dollar or a percent sign is skipped: those are
         /// scratch, tooling and version control folders. Matching them by name produced false
@@ -53,6 +79,40 @@ namespace SaveVault.Services
             }
 
             return folders.Contains(name);
+        }
+
+        /// <summary>
+        /// True for folders that belong to some other program. Stricter than <see cref="IsNoise" />
+        /// and used only where a folder has to prove it belongs to the game that was running.
+        ///
+        /// Reverse DNS names are rejected wholesale: an Electron or Tauri shell stores its data
+        /// in a folder such as "com.example.app", which no game engine has ever done.
+        /// </summary>
+        public static bool IsApplication(string folderName)
+        {
+            if (IsNoise(folderName))
+            {
+                return true;
+            }
+
+            var name = folderName.Trim();
+            if (applications.Contains(name))
+            {
+                return true;
+            }
+
+            var dot = name.IndexOf('.');
+            if (dot > 0 && dot < name.Length - 1)
+            {
+                var head = name.Substring(0, dot).ToLowerInvariant();
+                if (head == "com" || head == "org" || head == "net" || head == "io" ||
+                    head == "app" || head == "dev" || head == "me" || head == "cn")
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 
@@ -212,6 +272,49 @@ namespace SaveVault.Services
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Reusable title matcher.
+        ///
+        /// The user folder layer compares folder names against a game's title with a set of
+        /// rules that took a while to get right: word boundary prefixes, a length floor, a
+        /// bounded suffix. The learning layer needs the very same comparison to decide whether
+        /// an observed folder belongs to the game that was running, so the preparation of the
+        /// tokens lives here instead of being written a second time.
+        /// </summary>
+        public sealed class NameMatcher
+        {
+            private readonly List<string> wanted;
+            private readonly HashSet<string> prefixes;
+
+            public NameMatcher(IEnumerable<string> names)
+            {
+                var list = (names ?? new List<string>()).Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+                wanted = list
+                    .Select(LudusaviManifest.NormalizeName)
+                    .Where(n => n.Length >= 3)
+                    .Distinct()
+                    .ToList();
+                prefixes = WordPrefixKeys(list);
+            }
+
+            /// <summary>True when no usable token was found, in which case nothing may match.</summary>
+            public bool Empty
+            {
+                get { return wanted.Count == 0; }
+            }
+
+            public bool Matches(string candidate)
+            {
+                return !Empty && SaveScanner.Matches(wanted, prefixes, candidate);
+            }
+        }
+
+        /// <summary>Title matcher for one game, built from the same tokens a scan uses.</summary>
+        public static NameMatcher MatcherFor(Game game)
+        {
+            return new NameMatcher(NameTokens(game));
         }
 
         /// <summary>Developer and publisher names, used only by the registry guess.</summary>
@@ -782,10 +885,21 @@ namespace SaveVault.Services
         /// </summary>
         private bool WithinCaps(string folder, string filter)
         {
+            return WithinCaps(folder, filter, settings.MaxCandidateMegabytes, settings.MaxCandidateFiles);
+        }
+
+        /// <summary>
+        /// Same check with explicit limits, for callers that hold the settings but not a
+        /// scanner instance. The learning layer needs it: a folder observed during play used
+        /// to be recorded whatever its size, which is how a 446 MB browser cache ended up in
+        /// the vault.
+        /// </summary>
+        public static bool WithinCaps(string folder, string filter, int maxMegabytes, int maxCandidateFiles)
+        {
             long bytes = 0;
             var files = 0;
-            var maxBytes = (long)Math.Max(1, settings.MaxCandidateMegabytes) * 1024L * 1024L;
-            var maxFiles = Math.Max(10, settings.MaxCandidateFiles);
+            var maxBytes = (long)Math.Max(1, maxMegabytes) * 1024L * 1024L;
+            var maxFiles = Math.Max(10, maxCandidateFiles);
 
             try
             {
@@ -846,12 +960,70 @@ namespace SaveVault.Services
                 }
             }
 
+            Collapse(profile);
+
             profile.Targets = profile.Targets
                 .OrderBy(t => (int)t.Origin)
                 .ThenByDescending(t => t.Confidence)
                 .ToList();
 
             return added;
+        }
+
+        /// <summary>
+        /// Drops folder targets that already live inside another folder target.
+        /// </summary>
+        /// <remarks>
+        /// Engines that keep a save folder inside a save folder, and Japanese titles that name
+        /// both levels 存档, made the scanner record a parent and its child as two locations. Both
+        /// are then walked and both are written into the archive, so the inner files are stored
+        /// twice and every size shown to the user is inflated. Removing the inner entry cannot
+        /// lose data: the outer one covers it, as long as the outer has no file filter.
+        /// </remarks>
+        /// <returns>Number of targets removed.</returns>
+        public static int Collapse(GameSaveProfile profile)
+        {
+            if (profile == null || profile.Targets == null || profile.Targets.Count < 2)
+            {
+                return 0;
+            }
+
+            var folders = profile.Targets
+                .Where(t => t != null && t.Kind == TargetKind.Folder && !string.IsNullOrWhiteSpace(t.Path))
+                .ToList();
+
+            var doomed = new List<SaveTarget>();
+
+            foreach (var inner in folders)
+            {
+                foreach (var outer in folders)
+                {
+                    if (ReferenceEquals(inner, outer) || !string.IsNullOrEmpty(outer.Filter) ||
+                        !outer.Enabled || doomed.Contains(outer))
+                    {
+                        continue;
+                    }
+
+                    // Strict containment only. Under() treats an equal path as covered, and two
+                    // equal entries would then delete each other.
+                    if (string.Equals(inner.Path.TrimEnd('\\'), outer.Path.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) ||
+                        !LearnedGuard.Under(inner.Path, outer.Path))
+                    {
+                        continue;
+                    }
+
+                    doomed.Add(inner);
+                    logger.Info("Save Vault: " + inner.Path + " is already covered by " + outer.Path + ", dropping it.");
+                    break;
+                }
+            }
+
+            foreach (var target in doomed)
+            {
+                profile.Targets.Remove(target);
+            }
+
+            return doomed.Count;
         }
     }
 }
