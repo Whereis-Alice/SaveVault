@@ -238,6 +238,28 @@ namespace SaveVault.Services
             }
         }
 
+        /// <summary>
+        /// Drops a profile from the index. Used when a record only ever existed to carry a flag
+        /// that has just been cleared: keeping an empty entry per game would grow the index by
+        /// one row for every title the user ever looked at.
+        /// </summary>
+        /// <returns>True when a record was actually removed.</returns>
+        public bool Remove(Guid gameId)
+        {
+            lock (gate)
+            {
+                var loaded = Load();
+                var profile = loaded.Games.FirstOrDefault(g => g.GameId == gameId);
+                if (profile == null)
+                {
+                    return false;
+                }
+
+                loaded.Games.Remove(profile);
+                return true;
+            }
+        }
+
         public IEnumerable<GameSaveProfile> Profiles()
         {
             lock (gate)

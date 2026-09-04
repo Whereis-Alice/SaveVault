@@ -114,9 +114,46 @@
 
         <!-- ================================================================ game list -->
         <DockPanel Grid.Row="0" Grid.Column="0">
-            <TextBox DockPanel.Dock="Top" Margin="0,0,0,6"
-                     Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged, Delay=250}"
-                     ToolTip="{DynamicResource LOCSaveVaultFilterHint}" />
+            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                <!-- Scope first: the vault only knows the games it has touched, so excluding one it
+                     has never seen means listing the whole library. -->
+                <ComboBox Margin="0,0,0,6" SelectedIndex="{Binding ScopeIndex, Mode=TwoWay}">
+                    <ComboBoxItem Content="{DynamicResource LOCSaveVaultScopeVault}" />
+                    <ComboBoxItem Content="{DynamicResource LOCSaveVaultScopeAll}" />
+                    <ComboBoxItem Content="{DynamicResource LOCSaveVaultScopeExcluded}" />
+                </ComboBox>
+
+                <TextBox Text="{Binding Filter, UpdateSourceTrigger=PropertyChanged, Delay=250}"
+                         ToolTip="{DynamicResource LOCSaveVaultFilterHint}" />
+
+                <Grid Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="{DynamicResource LOCSaveVaultIncludeHeader}"
+                               Style="{StaticResource Small}" TextTrimming="CharacterEllipsis" />
+                    <Button Grid.Column="1" Style="{StaticResource Link}" Margin="8,0,0,0"
+                            Command="{Binding SelectAllCommand}"
+                            Content="{DynamicResource LOCSaveVaultActionSelectAll}" />
+                    <Button Grid.Column="2" Style="{StaticResource Link}" Margin="10,0,0,0"
+                            Command="{Binding SelectNoneCommand}"
+                            Content="{DynamicResource LOCSaveVaultActionSelectNone}" />
+                </Grid>
+            </StackPanel>
+
+            <!-- Unticking a game stops future backups but frees nothing, so the space its old
+                 snapshots still hold is stated here with a way to reclaim it. -->
+            <StackPanel DockPanel.Dock="Bottom" Margin="0,6,0,0">
+                <TextBlock Text="{Binding ExcludedText}" Style="{StaticResource Small}"
+                           TextTrimming="CharacterEllipsis" />
+                <Button Style="{StaticResource Link}" HorizontalAlignment="Left" Margin="0,3,0,0"
+                        Command="{Binding PurgeExcludedCommand}"
+                        Content="{DynamicResource LOCSaveVaultActionPurgeExcluded}"
+                        Visibility="{Binding HasExcludedSnapshots, Converter={StaticResource BoolToVis}}" />
+            </StackPanel>
 
             <ListBox ItemsSource="{Binding Games}" SelectedItem="{Binding SelectedGame}"
                      HorizontalContentAlignment="Stretch"
@@ -125,18 +162,30 @@
                     <DataTemplate>
                         <Grid Margin="0,2,0,2">
                             <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="0">
+                            <CheckBox Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Center"
+                                      IsChecked="{Binding IsIncluded, Mode=TwoWay}"
+                                      ToolTip="{DynamicResource LOCSaveVaultIncludeHint}" />
+
+                            <StackPanel Grid.Column="1" Opacity="{Binding RowOpacity}">
                                 <TextBlock Text="{Binding NameText}" TextTrimming="CharacterEllipsis"
                                            Foreground="{DynamicResource SaveVaultTextBrush}" />
                                 <TextBlock Text="{Binding StatusText}" Style="{StaticResource Small}"
                                            TextTrimming="CharacterEllipsis" />
                             </StackPanel>
 
-                            <TextBlock Grid.Column="1" Text="{Binding SizeText}" Style="{StaticResource Small}"
+                            <Border Grid.Column="2" Style="{StaticResource Chip}" Margin="8,0,0,0"
+                                    Visibility="{Binding IsExcluded, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{DynamicResource LOCSaveVaultExcludedMark}"
+                                           Style="{StaticResource Small}" />
+                            </Border>
+
+                            <TextBlock Grid.Column="3" Text="{Binding SizeText}" Style="{StaticResource Small}"
                                        Margin="8,0,0,0" />
                         </Grid>
                     </DataTemplate>
@@ -313,6 +362,8 @@
                         Content="{DynamicResource LOCSaveVaultActionPrune}" />
                 <Button Style="{StaticResource Bar}" Command="{Binding RefreshCommand}"
                         Content="{DynamicResource LOCSaveVaultActionRefresh}" />
+                <Button Style="{StaticResource Bar}" Command="{Binding OpenSettingsCommand}"
+                        Content="{DynamicResource LOCSaveVaultActionSettings}" />
             </WrapPanel>
 
             <Button Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Style="{StaticResource Link}"

@@ -152,6 +152,7 @@ namespace SaveVault.Services
             var games = api.Database.Games.Where(g => !g.Hidden).ToList();
             var withTargets = 0;
             var added = 0;
+            var excluded = 0;
 
             RunWithProgress(Localization.Get("LOCSaveVaultProgressDetectAll", "Looking for save locations in the whole library"),
                 progress =>
@@ -174,6 +175,17 @@ namespace SaveVault.Services
                             progress.CurrentProgressValue++;
                         }
 
+                        // A game the user took out of automatic backups should not be scanned by
+                        // the library wide pass either: it costs minutes of disk walking to learn
+                        // locations nothing will ever use. Detection on that single game from its
+                        // own menu still works.
+                        var known = store.Find(game.Id);
+                        if (known != null && known.Excluded)
+                        {
+                            excluded++;
+                            continue;
+                        }
+
                         added += Detect(game, false);
 
                         var profile = store.Find(game.Id);
@@ -188,7 +200,8 @@ namespace SaveVault.Services
             RaiseChanged();
 
             Info(Localization.Get("LOCSaveVaultDetectAllDone", "Library scan finished.") + "\n" +
-                 Localization.Get("LOCSaveVaultDetectAllGames", "Games with a known save location:") + " " + withTargets + "/" + games.Count + "  (+" + added + ")");
+                 Localization.Get("LOCSaveVaultDetectAllGames", "Games with a known save location:") + " " + withTargets + "/" + games.Count + "  (+" + added + ")" +
+                 (excluded > 0 ? "\n" + Localization.Get("LOCSaveVaultStatExcluded", "Skipped, not backed up automatically:") + " " + excluded : string.Empty));
         }
 
         // ----------------------------------------------------------------------- backup
@@ -287,6 +300,7 @@ namespace SaveVault.Services
             var empty = 0;
             var failed = 0;
             var oversized = 0;
+            var excluded = 0;
 
             RunWithProgress(Localization.Get("LOCSaveVaultProgressBackupAll", "Backing up the whole library"),
                 progress =>
@@ -330,6 +344,10 @@ namespace SaveVault.Services
                         {
                             oversized++;
                         }
+                        else if (result.Skipped)
+                        {
+                            excluded++;
+                        }
                     }
                 });
 
@@ -337,6 +355,7 @@ namespace SaveVault.Services
                  Localization.Get("LOCSaveVaultStatCreated", "New snapshots:") + " " + created + "\n" +
                  Localization.Get("LOCSaveVaultStatUnchanged", "Unchanged:") + " " + unchanged + "\n" +
                  Localization.Get("LOCSaveVaultStatNoTargets", "No known location:") + " " + empty +
+                 (excluded > 0 ? "\n" + Localization.Get("LOCSaveVaultStatExcluded", "Skipped, not backed up automatically:") + " " + excluded : string.Empty) +
                  (oversized > 0 ? "\n" + Localization.Get("LOCSaveVaultStatOversized", "Too large:") + " " + oversized : string.Empty) +
                  (failed > 0 ? "\n" + Localization.Get("LOCSaveVaultStatFailed", "Failed:") + " " + failed : string.Empty) +
                  QuotaHint());
@@ -524,6 +543,163 @@ namespace SaveVault.Services
             var after = store.TotalBytes();
             Info(Localization.Get("LOCSaveVaultPruneDone", "Retention applied.") + "\n" +
                  Localization.Get("LOCSaveVaultPruneFreed", "Reclaimed:") + " " + FormatSize(Math.Max(0, before - after)) + "\n" +
+                 Localization.Get("LOCSaveVaultVaultSize", "Vault size:") + " " + FormatSize(after) +
+                 QuotaHint());
+        }
+
+        // ------------------------------------------------------------------ exclusions
+
+        /// <summary>
+        /// Flips the "skip automatic backups" flag for a set of library games.
+        ///
+        /// This is what the user reaches for when a game's save folder is enormous - a sandbox
+        /// game's world files, an emulator's state directory - or simply not worth keeping. The
+        /// flag on its own reclaims nothing, so when snapshots are already stored the caller can
+        /// let this offer to delete them in the same step; that is the only destructive part and
+        /// it is always confirmed.
+        /// </summary>
+        /// <returns>Number of games whose flag actually changed.</returns>
+        public int SetExcluded(IEnumerable<Game> games, bool excluded, bool offerDelete)
+        {
+            if (games == null)
+            {
+                return 0;
+            }
+
+            var profiles = new List<GameSaveProfile>();
+            foreach (var game in games)
+            {
+                if (game == null)
+                {
+                    continue;
+                }
+
+                // Being backed up is the default, so a game with no record needs none to stay
+                // included; only an exclusion has to be written down.
+                var profile = excluded ? store.GetOrCreate(game) : store.Find(game.Id);
+                if (profile != null)
+                {
+                    profiles.Add(profile);
+                }
+            }
+
+            return SetExcluded(profiles, excluded, offerDelete);
+        }
+
+        /// <summary>
+        /// Profile level overload, also used for records whose game has left the library.
+        /// </summary>
+        public int SetExcluded(IEnumerable<GameSaveProfile> profiles, bool excluded, bool offerDelete)
+        {
+            var changed = (profiles ?? Enumerable.Empty<GameSaveProfile>())
+                .Where(profile => profile != null && profile.Excluded != excluded)
+                .ToList();
+
+            if (changed.Count == 0)
+            {
+                return 0;
+            }
+
+            lock (workGate)
+            {
+                foreach (var profile in changed)
+                {
+                    profile.Excluded = excluded;
+                }
+
+                if (!excluded)
+                {
+                    // A record that only ever existed to carry the flag has nothing left to say.
+                    foreach (var empty in changed
+                        .Where(item => item.Snapshots.Count == 0 && !item.HasTargets && !item.ScannedUtc.HasValue)
+                        .ToList())
+                    {
+                        store.Remove(empty.GameId);
+                    }
+                }
+
+                store.Save();
+            }
+
+            if (excluded && offerDelete)
+            {
+                DropSnapshots(changed);
+            }
+
+            RaiseChanged();
+            return changed.Count;
+        }
+
+        /// <summary>Deletes every snapshot belonging to an excluded game, after confirmation.</summary>
+        public void PurgeExcludedInteractive()
+        {
+            var stored = store.Profiles().Where(profile => profile.Excluded && profile.Snapshots.Count > 0).ToList();
+            if (stored.Count == 0)
+            {
+                Info(Localization.Get("LOCSaveVaultExcludeNothing",
+                    "No excluded game is holding on to snapshots."));
+                return;
+            }
+
+            DropSnapshots(stored);
+            RaiseChanged();
+        }
+
+        /// <summary>
+        /// Offers to delete the stored snapshots of the given profiles. Shared by the exclusion
+        /// toggle and by the manager's cleanup button so both ask the same question and report
+        /// the same numbers.
+        /// </summary>
+        private void DropSnapshots(List<GameSaveProfile> profiles)
+        {
+            var stored = profiles.Where(profile => profile.Snapshots.Count > 0).ToList();
+            if (stored.Count == 0 || api == null || api.Dialogs == null)
+            {
+                return;
+            }
+
+            var count = stored.Sum(profile => profile.Snapshots.Count);
+            var bytes = stored.Sum(profile => profile.Snapshots.Sum(snapshot => snapshot.Bytes));
+
+            var question = Localization.Fill("LOCSaveVaultExcludeDropAsk",
+                                "Excluded games are still holding {0} snapshots, taking up {1}. Delete them?",
+                                count, FormatSize(bytes)) + "\n\n" +
+                           string.Join("\n", stored
+                               .OrderByDescending(profile => profile.Snapshots.Sum(snapshot => snapshot.Bytes))
+                               .Take(6)
+                               .Select(profile => profile.Name + "  ·  " +
+                                   FormatSize(profile.Snapshots.Sum(snapshot => snapshot.Bytes)))) +
+                           (stored.Count > 6 ? "\n…" : string.Empty);
+
+            if (api.Dialogs.ShowMessage(question, Name(), System.Windows.MessageBoxButton.YesNo) !=
+                System.Windows.MessageBoxResult.Yes)
+            {
+                return;
+            }
+
+            var before = store.TotalBytes();
+
+            RunWithProgress(Localization.Get("LOCSaveVaultProgressDrop", "Deleting snapshots"),
+                () =>
+                {
+                    lock (workGate)
+                    {
+                        foreach (var profile in stored)
+                        {
+                            foreach (var snapshot in profile.Snapshots.ToList())
+                            {
+                                snapshots.Delete(profile, snapshot);
+                            }
+                        }
+
+                        store.Save();
+                    }
+                });
+
+            var after = store.TotalBytes();
+            Info(Localization.Fill("LOCSaveVaultExcludeDropDone", "Deleted {0} snapshots.", count) + "\n" +
+                 Localization.Get("LOCSaveVaultPruneFreed", "Reclaimed:") + " " +
+                 FormatSize(Math.Max(0, before - after)) + "\n" +
                  Localization.Get("LOCSaveVaultVaultSize", "Vault size:") + " " + FormatSize(after) +
                  QuotaHint());
         }

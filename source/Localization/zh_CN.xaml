@@ -18,10 +18,14 @@
     <sys:String x:Key="LOCSaveVaultActionOpenFolder">打开文件夹</sys:String>
     <sys:String x:Key="LOCSaveVaultActionPin">固定此快照，使其不会被自动清理</sys:String>
     <sys:String x:Key="LOCSaveVaultActionPrune">执行清理</sys:String>
+    <sys:String x:Key="LOCSaveVaultActionPurgeExcluded">删除它们的快照</sys:String>
     <sys:String x:Key="LOCSaveVaultActionRefresh">刷新</sys:String>
     <sys:String x:Key="LOCSaveVaultActionReload">重新载入</sys:String>
     <sys:String x:Key="LOCSaveVaultActionRemoveTarget">移除</sys:String>
     <sys:String x:Key="LOCSaveVaultActionRestore">还原</sys:String>
+    <sys:String x:Key="LOCSaveVaultActionSelectAll">全选</sys:String>
+    <sys:String x:Key="LOCSaveVaultActionSelectNone">全不选</sys:String>
+    <sys:String x:Key="LOCSaveVaultActionSettings">设置…</sys:String>
     <sys:String x:Key="LOCSaveVaultAgoDays">{0} 天前</sys:String>
     <sys:String x:Key="LOCSaveVaultAgoHours">{0} 小时前</sys:String>
     <sys:String x:Key="LOCSaveVaultAgoMinutes">{0} 分钟前</sys:String>
@@ -41,9 +45,17 @@
     <sys:String x:Key="LOCSaveVaultErrRootRelative">备份文件夹必须是绝对路径。</sys:String>
     <sys:String x:Key="LOCSaveVaultErrorArchiveMissing">快照文件已丢失。</sys:String>
     <sys:String x:Key="LOCSaveVaultErrorRoot">备份文件夹无法写入。</sys:String>
+    <sys:String x:Key="LOCSaveVaultExcludeDropAsk">被排除的游戏还留着 {0} 个快照，占用 {1}。现在删掉吗？</sys:String>
+    <sys:String x:Key="LOCSaveVaultExcludeDropDone">已删除 {0} 个快照。</sys:String>
+    <sys:String x:Key="LOCSaveVaultExcludeManyAsk">确定不再备份列表里这 {0} 个游戏吗？</sys:String>
+    <sys:String x:Key="LOCSaveVaultExcludeNone">当前没有排除任何游戏。</sys:String>
+    <sys:String x:Key="LOCSaveVaultExcludeNothing">被排除的游戏里没有留下快照。</sys:String>
+    <sys:String x:Key="LOCSaveVaultExcludeSummary">已排除 {0} 个 · 仍占用 {1}</sys:String>
     <sys:String x:Key="LOCSaveVaultExcludedMark">已排除</sys:String>
     <sys:String x:Key="LOCSaveVaultFilesWord">个文件</sys:String>
     <sys:String x:Key="LOCSaveVaultFilterHint">按名称筛选游戏</sys:String>
+    <sys:String x:Key="LOCSaveVaultIncludeHeader">勾选的游戏会被自动备份。</sys:String>
+    <sys:String x:Key="LOCSaveVaultIncludeHint">取消勾选后，自动备份和全库备份都会跳过这个游戏；手动备份仍然可用，已有的快照也会保留。</sys:String>
     <sys:String x:Key="LOCSaveVaultKindFolder">文件</sys:String>
     <sys:String x:Key="LOCSaveVaultKindRegistry">注册表</sys:String>
     <sys:String x:Key="LOCSaveVaultLocationsCount">{0} 处位置</sys:String>
@@ -53,7 +65,8 @@
     <sys:String x:Key="LOCSaveVaultMenuBackupAll">备份整个游戏库</sys:String>
     <sys:String x:Key="LOCSaveVaultMenuDetect">查找存档位置</sys:String>
     <sys:String x:Key="LOCSaveVaultMenuDetectAll">为所有游戏查找存档位置</sys:String>
-    <sys:String x:Key="LOCSaveVaultMenuExclude">在全库备份中跳过</sys:String>
+    <sys:String x:Key="LOCSaveVaultMenuExclude">不再自动备份</sys:String>
+    <sys:String x:Key="LOCSaveVaultMenuInclude">恢复自动备份</sys:String>
     <sys:String x:Key="LOCSaveVaultMenuManage">打开存档方舟…</sys:String>
     <sys:String x:Key="LOCSaveVaultMenuOpenFolder">打开备份文件夹</sys:String>
     <sys:String x:Key="LOCSaveVaultMenuPrune">执行保留策略清理</sys:String>
@@ -96,6 +109,8 @@
     <sys:String x:Key="LOCSaveVaultOptScheduled">定时备份</sys:String>
     <sys:String x:Key="LOCSaveVaultOptScheduledHint">Playnite 运行期间每隔一段时间检查一次。只有存档发生变化的游戏才会生成新快照。</sys:String>
     <sys:String x:Key="LOCSaveVaultOptSnapshotHint">存档位置体积超过此上限的游戏会被跳过并提示，避免一个游戏吃掉整个空间预算。填 0 表示不限制。</sys:String>
+    <sys:String x:Key="LOCSaveVaultOptTopPanel">在顶栏显示入口按钮</sys:String>
+    <sys:String x:Key="LOCSaveVaultOptTopPanelHint">一键打开存档方舟，并显示当前占用了多少空间预算。</sys:String>
     <sys:String x:Key="LOCSaveVaultOptUseLudusavi">使用 Ludusavi 清单</sys:String>
     <sys:String x:Key="LOCSaveVaultOptUseLudusaviHint">把 Ludusavi 的存档路径数据库作为线索之一读取。不需要安装 Ludusavi 也能工作，日系小众作品通常查不到。</sys:String>
     <sys:String x:Key="LOCSaveVaultOriginInstallFolder">安装目录</sys:String>
@@ -110,6 +125,7 @@
     <sys:String x:Key="LOCSaveVaultProgressBackupAll">正在备份整个游戏库</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressDetect">正在查找存档位置</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressDetectAll">正在为整个游戏库查找存档位置</sys:String>
+    <sys:String x:Key="LOCSaveVaultProgressDrop">正在删除快照</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressPrune">正在执行保留策略</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressPurgeLearned">正在重新校验学习到的位置</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressRestore">正在还原</sys:String>
@@ -130,6 +146,9 @@
     <sys:String x:Key="LOCSaveVaultRestoreUndoHint">当前状态会先自动存成一个快照，所以这一步可以撤销。</sys:String>
     <sys:String x:Key="LOCSaveVaultRowStatus">{0} 个快照 · {1}</sys:String>
     <sys:String x:Key="LOCSaveVaultScheduledDone">定时备份：</sys:String>
+    <sys:String x:Key="LOCSaveVaultScopeAll">整个游戏库</sys:String>
+    <sys:String x:Key="LOCSaveVaultScopeExcluded">仅已排除</sys:String>
+    <sys:String x:Key="LOCSaveVaultScopeVault">方舟内的游戏</sys:String>
     <sys:String x:Key="LOCSaveVaultSettingsAbout">关于</sys:String>
     <sys:String x:Key="LOCSaveVaultSettingsBackup">备份</sys:String>
     <sys:String x:Key="LOCSaveVaultSettingsDetect">检测</sys:String>
@@ -142,6 +161,7 @@
     <sys:String x:Key="LOCSaveVaultSnapshotsCaption">快照</sys:String>
     <sys:String x:Key="LOCSaveVaultSnapshotsWord">个快照</sys:String>
     <sys:String x:Key="LOCSaveVaultStatCreated">新建快照：</sys:String>
+    <sys:String x:Key="LOCSaveVaultStatExcluded">已排除，未自动备份：</sys:String>
     <sys:String x:Key="LOCSaveVaultStatFailed">失败：</sys:String>
     <sys:String x:Key="LOCSaveVaultStatNoTargets">无已知位置：</sys:String>
     <sys:String x:Key="LOCSaveVaultStatOversized">体积超限：</sys:String>
@@ -157,6 +177,7 @@
     <sys:String x:Key="LOCSaveVaultTargetsCaption">存档位置</sys:String>
     <sys:String x:Key="LOCSaveVaultTooLarge">这个游戏的存档位置共 {0}，超过单次快照上限 {1}，本次没有写入任何内容。</sys:String>
     <sys:String x:Key="LOCSaveVaultTooLargeHint">可以在管理器里删掉体积过大的那个位置、用文件筛选缩小范围，或者在设置里提高上限。</sys:String>
+    <sys:String x:Key="LOCSaveVaultTopPanelUsage">已用 {0} / 共 {1}</sys:String>
     <sys:String x:Key="LOCSaveVaultTotals">{0} 个游戏 · {1} 个快照 · 已用 {2} / {3}</sys:String>
     <sys:String x:Key="LOCSaveVaultTriggerBeforeLaunch">启动前</sys:String>
     <sys:String x:Key="LOCSaveVaultTriggerBeforeRestore">还原前备份</sys:String>

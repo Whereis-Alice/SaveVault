@@ -1,5 +1,18 @@
 ﻿AddonId: SaveVault_fd085db8-9b7c-4f83-a2df-3f0784eae1d0
 Packages:
+  - Version: 1.1.0
+    RequiredApiVersion: 6.0.0
+    ReleaseDate: 2026-09-04
+    PackageUrl: https://github.com/Whereis-Alice/SaveVault/releases/download/1.1.0/SaveVault_fd085db8-9b7c-4f83-a2df-3f0784eae1d0_1_1_0.pext
+    Changelog:
+      - New top panel button that opens the vault in one click and shows how much of the size budget is already spent, with a setting to hide it again
+      - Games can be taken out of automatic backups with a checkbox per row in the manager, one row at a time or a whole filtered selection at once
+      - New scope selector in the manager: games already in the vault, the whole library, or only the excluded ones, so a game can be skipped before it is ever scanned
+      - Select all and select none next to the name filter
+      - The manager footer now states how many games are excluded and how much space their old snapshots still take, with one button to delete exactly those snapshots after confirmation
+      - The game menu entry flips between skipping and resuming automatic backups depending on what the selection currently is, and no longer claims to do the opposite of what it does
+      - An excluded game is skipped by the post play backup, the scheduled backup, the library wide backup, runtime learning and the library wide detection, and both library summaries now report how many games were skipped instead of quietly dropping them from every count
+      - An excluded game stays restorable and can still be backed up by hand from its own menu
   - Version: 1.0.1
     RequiredApiVersion: 6.0.0
     ReleaseDate: 2026-09-04

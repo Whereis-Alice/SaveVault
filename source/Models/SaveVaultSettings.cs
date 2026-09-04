@@ -37,6 +37,8 @@ namespace SaveVault.Models
         private int maxSnapshotFiles = 20000;
         private bool autoScanNewGames = true;
 
+        private bool showTopPanelButton = true;
+
         private DateTime? lastScheduledRunUtc;
         private int learnedGuardVersion;
 
@@ -233,6 +235,18 @@ namespace SaveVault.Models
             set { SetValue(ref autoScanNewGames, value); }
         }
 
+        /// <summary>
+        /// Shows the vault in Playnite's top panel. On by default: the manager is where
+        /// exclusions, restores and the size budget are handled, and burying it three levels
+        /// deep in the main menu is the reason a user never opens it.
+        /// </summary>
+        [SerializationPropertyName("showTopPanelButton")]
+        public bool ShowTopPanelButton
+        {
+            get { return showTopPanelButton; }
+            set { SetValue(ref showTopPanelButton, value); }
+        }
+
         [SerializationPropertyName("lastScheduledRunUtc")]
         public DateTime? LastScheduledRunUtc
         {
@@ -296,6 +310,7 @@ namespace SaveVault.Models
             MaxSnapshotMegabytes = other.MaxSnapshotMegabytes;
             MaxSnapshotFiles = other.MaxSnapshotFiles;
             AutoScanNewGames = other.AutoScanNewGames;
+            ShowTopPanelButton = other.ShowTopPanelButton;
 
             LastScheduledRunUtc = other.LastScheduledRunUtc;
             LearnedGuardVersion = other.LearnedGuardVersion;

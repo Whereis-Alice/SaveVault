@@ -13,13 +13,39 @@ namespace SaveVault.ViewModels
     /// <summary>One row in the manager's game list.</summary>
     public class VaultGameViewModel : ObservableObject
     {
-        public VaultGameViewModel(GameSaveProfile profile, Game game)
+        private readonly Action<VaultGameViewModel, bool> apply;
+
+        /// <summary>
+        /// Held while a deferred include/exclude call is in flight, so the tick box stays where the
+        /// user put it instead of snapping back while a confirmation dialog is still open.
+        /// </summary>
+        private bool? pending;
+
+        public VaultGameViewModel(GameSaveProfile profile, Game game, bool detached = false,
+            Action<VaultGameViewModel, bool> apply = null)
         {
             Profile = profile;
             Game = game;
+            IsDetached = detached;
+            this.apply = apply;
         }
 
         public GameSaveProfile Profile { get; private set; }
+
+        /// <summary>
+        /// True for a row that stands for a library game the vault has no record of yet. Listing
+        /// those is what makes "back up everything except..." possible - you cannot untick a game
+        /// that is not on screen.
+        /// </summary>
+        public bool IsDetached { get; private set; }
+
+        /// <summary>Promotes the row to a real record, once there is something to write down.</summary>
+        public void Attach(GameSaveProfile stored)
+        {
+            Profile = stored;
+            IsDetached = false;
+            Refresh();
+        }
 
         /// <summary>Null when the game was removed from the library but its snapshots are still kept.</summary>
         public Game Game { get; private set; }
@@ -36,7 +62,7 @@ namespace SaveVault.ViewModels
 
         public string SizeText
         {
-            get { return VaultController.FormatSize(Bytes); }
+            get { return Bytes == 0 ? string.Empty : VaultController.FormatSize(Bytes); }
         }
 
         public string StatusText
@@ -63,17 +89,52 @@ namespace SaveVault.ViewModels
             get { return Game == null; }
         }
 
+        /// <summary>
+        /// The row's tick box. Being backed up is the default, so this is stored inverted: only an
+        /// exclusion is ever written to the index.
+        /// </summary>
+        public bool IsIncluded
+        {
+            get { return pending ?? !Profile.Excluded; }
+            set
+            {
+                if (IsIncluded == value)
+                {
+                    return;
+                }
+
+                pending = value;
+                OnPropertyChanged("IsIncluded");
+                OnPropertyChanged("IsExcluded");
+                OnPropertyChanged("RowOpacity");
+
+                if (apply != null)
+                {
+                    apply(this, value);
+                }
+            }
+        }
+
         public bool IsExcluded
         {
-            get { return Profile.Excluded; }
+            get { return !IsIncluded; }
+        }
+
+        /// <summary>Dims a skipped row so it reads as skipped without having to look for a label.</summary>
+        public double RowOpacity
+        {
+            get { return IsIncluded ? 1.0 : 0.55; }
         }
 
         public void Refresh()
         {
+            pending = null;
             OnPropertyChanged("NameText");
             OnPropertyChanged("SizeText");
             OnPropertyChanged("StatusText");
+            OnPropertyChanged("IsIncluded");
             OnPropertyChanged("IsExcluded");
+            OnPropertyChanged("RowOpacity");
         }
     }
 
@@ -95,6 +156,11 @@ namespace SaveVault.ViewModels
         private TargetViewModel selectedTarget;
         private string filter;
         private bool suspend;
+        private int scope;
+
+        private const int ScopeVault = 0;
+        private const int ScopeAll = 1;
+        private const int ScopeExcluded = 2;
 
         public VaultManagerViewModel(VaultController controller, IPlayniteAPI api)
         {
@@ -118,6 +184,17 @@ namespace SaveVault.ViewModels
             PruneCommand = new RelayCommand(() => controller.PruneInteractive());
             RefreshCommand = new RelayCommand(Reconcile);
             OpenVaultRootCommand = new RelayCommand(() => controller.OpenPath(controller.Store.Root));
+            SelectAllCommand = new RelayCommand(() => SetAll(true));
+            SelectNoneCommand = new RelayCommand(() => SetAll(false));
+            PurgeExcludedCommand = new RelayCommand(() => controller.PurgeExcludedInteractive());
+            OpenSettingsCommand = new RelayCommand(() =>
+            {
+                var open = OpenSettingsAction;
+                if (open != null)
+                {
+                    open();
+                }
+            }, () => OpenSettingsAction != null);
 
             controller.Changed += OnControllerChanged;
             Reload();
@@ -158,6 +235,20 @@ namespace SaveVault.ViewModels
         public RelayCommand RefreshCommand { get; private set; }
 
         public RelayCommand OpenVaultRootCommand { get; private set; }
+
+        public RelayCommand SelectAllCommand { get; private set; }
+
+        public RelayCommand SelectNoneCommand { get; private set; }
+
+        public RelayCommand PurgeExcludedCommand { get; private set; }
+
+        public RelayCommand OpenSettingsCommand { get; private set; }
+
+        /// <summary>
+        /// Supplied by the plugin, which owns the window and can only open its settings once this
+        /// dialog has closed. Null when there is nowhere to go.
+        /// </summary>
+        public Action OpenSettingsAction { get; set; }
 
         // ------------------------------------------------------------------- selection
 
@@ -200,6 +291,25 @@ namespace SaveVault.ViewModels
                 }
 
                 SetValue(ref filter, value);
+                Reload();
+            }
+        }
+
+        /// <summary>
+        /// What the left hand list shows: the vault's own records, the whole library, or only the
+        /// games that are currently skipped.
+        /// </summary>
+        public int ScopeIndex
+        {
+            get { return scope; }
+            set
+            {
+                if (scope == value)
+                {
+                    return;
+                }
+
+                SetValue(ref scope, value);
                 Reload();
             }
         }
@@ -247,6 +357,32 @@ namespace SaveVault.ViewModels
             get { return controller.Store.Root; }
         }
 
+        /// <summary>
+        /// "3 excluded · 1.2 GB still stored". The second half is the point: unticking a game stops
+        /// future backups but frees nothing on its own.
+        /// </summary>
+        public string ExcludedText
+        {
+            get
+            {
+                var excluded = controller.Store.Profiles().Where(profile => profile.Excluded).ToList();
+                if (excluded.Count == 0)
+                {
+                    return Localization.Get("LOCSaveVaultExcludeNone", "No game is excluded.");
+                }
+
+                var bytes = excluded.Sum(profile => profile.Snapshots.Sum(snapshot => snapshot.Bytes));
+                return VaultText.Fill("LOCSaveVaultExcludeSummary", "{0} excluded · {1} still stored",
+                    excluded.Count, VaultController.FormatSize(bytes));
+            }
+        }
+
+        /// <summary>Drives the cleanup link, which is pointless when there is nothing to delete.</summary>
+        public bool HasExcludedSnapshots
+        {
+            get { return controller.Store.Profiles().Any(profile => profile.Excluded && profile.Snapshots.Count > 0); }
+        }
+
         // ------------------------------------------------------------------- plumbing
 
         public void Reload()
@@ -257,18 +393,37 @@ namespace SaveVault.ViewModels
             Games.Clear();
 
             var needle = string.IsNullOrWhiteSpace(filter) ? null : filter.Trim();
+            var known = new HashSet<Guid>();
+
             foreach (var profile in controller.Store.Profiles()
                 .OrderByDescending(item => item.LastBackupUtc ?? DateTime.MinValue)
                 .ThenBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase))
             {
-                var game = FindGame(profile.GameId);
-                var name = game != null ? game.Name : profile.Name;
-                if (needle != null && (name == null || name.IndexOf(needle, StringComparison.CurrentCultureIgnoreCase) < 0))
+                known.Add(profile.GameId);
+                if (scope == ScopeExcluded && !profile.Excluded)
                 {
                     continue;
                 }
 
-                Games.Add(new VaultGameViewModel(profile, game));
+                var game = FindGame(profile.GameId);
+                if (!Matches(game != null ? game.Name : profile.Name, needle))
+                {
+                    continue;
+                }
+
+                Games.Add(NewRow(profile, game, false));
+            }
+
+            if (scope == ScopeAll && api != null && api.Database != null)
+            {
+                // Games the vault has never touched. They come last: every row above has something
+                // to report, these exist only so they can be ticked off.
+                foreach (var game in api.Database.Games
+                    .Where(item => item != null && !item.Hidden && !known.Contains(item.Id) && Matches(item.Name, needle))
+                    .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase))
+                {
+                    Games.Add(NewRow(Detached(game), game, true));
+                }
             }
 
             suspend = false;
@@ -280,6 +435,132 @@ namespace SaveVault.ViewModels
             OnPropertyChanged("TotalText");
             OnPropertyChanged("QuotaPercent");
             OnPropertyChanged("RootText");
+            OnPropertyChanged("ExcludedText");
+            OnPropertyChanged("HasExcludedSnapshots");
+        }
+
+        private VaultGameViewModel NewRow(GameSaveProfile profile, Game game, bool detached)
+        {
+            return new VaultGameViewModel(profile, game, detached, SetIncluded);
+        }
+
+        /// <summary>A stand-in record so a library game with no history can still be listed.</summary>
+        private static GameSaveProfile Detached(Game game)
+        {
+            return new GameSaveProfile
+            {
+                GameId = game.Id,
+                Name = game.Name,
+                Folder = PathTokens.SanitizeFolderName(game.Name, game.Id)
+            };
+        }
+
+        private static bool Matches(string name, string needle)
+        {
+            if (needle == null)
+            {
+                return true;
+            }
+
+            return name != null && name.IndexOf(needle, StringComparison.CurrentCultureIgnoreCase) >= 0;
+        }
+
+        /// <summary>
+        /// Runs work once the current input event is over. Excluding a game can raise a
+        /// confirmation dialog, and opening one from inside a tick box's binding write leaves WPF
+        /// holding the value it started with.
+        /// </summary>
+        private static void Defer(Action work)
+        {
+            var app = Application.Current;
+            if (app == null)
+            {
+                work();
+                return;
+            }
+
+            app.Dispatcher.BeginInvoke(work);
+        }
+
+        /// <summary>Applies a single row's tick box.</summary>
+        private void SetIncluded(VaultGameViewModel row, bool included)
+        {
+            var game = row.Game;
+            var profile = row.Profile;
+
+            Defer(() =>
+            {
+                if (game != null)
+                {
+                    controller.SetExcluded(new List<Game> { game }, !included, true);
+                }
+                else
+                {
+                    controller.SetExcluded(new List<GameSaveProfile> { profile }, !included, true);
+                }
+
+                Reload();
+            });
+        }
+
+        /// <summary>
+        /// Ticks or unticks everything currently listed. It deliberately obeys the filter and the
+        /// scope, which makes "type BALDR, untick all" the quickest way to skip a whole series.
+        /// </summary>
+        private void SetAll(bool included)
+        {
+            var rows = Games.Where(row => row.IsIncluded != included).ToList();
+            if (rows.Count == 0)
+            {
+                return;
+            }
+
+            if (!included && rows.Count > 10 && api != null && api.Dialogs != null &&
+                api.Dialogs.ShowMessage(
+                    VaultText.Fill("LOCSaveVaultExcludeManyAsk", "Stop backing up all {0} listed games?", rows.Count),
+                    VaultController.Name(), MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+            {
+                Reload();
+                return;
+            }
+
+            var profiles = new List<GameSaveProfile>();
+            foreach (var row in rows)
+            {
+                if (row.Game == null)
+                {
+                    profiles.Add(row.Profile);
+                    continue;
+                }
+
+                // Included is the default, so only an exclusion needs a record of its own.
+                var stored = included ? controller.Store.Find(row.Game.Id) : controller.Store.GetOrCreate(row.Game);
+                if (stored != null)
+                {
+                    profiles.Add(stored);
+                }
+            }
+
+            Defer(() =>
+            {
+                controller.SetExcluded(profiles, !included, true);
+                Reload();
+            });
+        }
+
+        /// <summary>
+        /// Turns a listed but unknown game into a real record, right before something has to be
+        /// written to it.
+        /// </summary>
+        private GameSaveProfile Materialize(VaultGameViewModel row)
+        {
+            if (row.IsDetached && row.Game != null)
+            {
+                row.Attach(controller.Store.GetOrCreate(row.Game));
+                controller.Store.Save();
+            }
+
+            return row.Profile;
         }
 
         private void RebuildDetails()
@@ -371,11 +652,13 @@ namespace SaveVault.ViewModels
 
         private void Backup()
         {
+            Materialize(selected);
             controller.BackupInteractive(selected.Game);
         }
 
         private void Detect()
         {
+            Materialize(selected);
             controller.DetectInteractive(selected.Game);
         }
 
@@ -391,7 +674,7 @@ namespace SaveVault.ViewModels
 
         private void OpenFolder()
         {
-            controller.OpenVaultFolder(selected.Profile);
+            controller.OpenVaultFolder(Materialize(selected));
         }
 
         private void OpenPath(TargetViewModel item)
@@ -428,7 +711,7 @@ namespace SaveVault.ViewModels
                 Enabled = true
             };
 
-            var added = SaveScanner.Merge(selected.Profile, new List<SaveTarget> { target });
+            var added = SaveScanner.Merge(Materialize(selected), new List<SaveTarget> { target });
             controller.Store.Save();
             Reload();
 

@@ -144,6 +144,9 @@
                               Content="{DynamicResource LOCSaveVaultOptConfirmRestore}" />
                     <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.NotifyOnBackup}"
                               Content="{DynamicResource LOCSaveVaultOptNotify}" />
+                    <CheckBox Style="{StaticResource Row}" IsChecked="{Binding Settings.ShowTopPanelButton}"
+                              Content="{DynamicResource LOCSaveVaultOptTopPanel}" />
+                    <TextBlock Text="{DynamicResource LOCSaveVaultOptTopPanelHint}" Style="{StaticResource Hint}" />
 
                     <Separator Margin="0,4,0,12" />
 

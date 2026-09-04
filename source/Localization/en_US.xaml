@@ -18,10 +18,14 @@
     <sys:String x:Key="LOCSaveVaultActionOpenFolder">Open folder</sys:String>
     <sys:String x:Key="LOCSaveVaultActionPin">Pin this snapshot so it is never removed automatically</sys:String>
     <sys:String x:Key="LOCSaveVaultActionPrune">Apply retention</sys:String>
+    <sys:String x:Key="LOCSaveVaultActionPurgeExcluded">Delete their snapshots</sys:String>
     <sys:String x:Key="LOCSaveVaultActionRefresh">Refresh</sys:String>
     <sys:String x:Key="LOCSaveVaultActionReload">Reload</sys:String>
     <sys:String x:Key="LOCSaveVaultActionRemoveTarget">Remove</sys:String>
     <sys:String x:Key="LOCSaveVaultActionRestore">Restore</sys:String>
+    <sys:String x:Key="LOCSaveVaultActionSelectAll">Select all</sys:String>
+    <sys:String x:Key="LOCSaveVaultActionSelectNone">Select none</sys:String>
+    <sys:String x:Key="LOCSaveVaultActionSettings">Settings…</sys:String>
     <sys:String x:Key="LOCSaveVaultAgoDays">{0} d ago</sys:String>
     <sys:String x:Key="LOCSaveVaultAgoHours">{0} h ago</sys:String>
     <sys:String x:Key="LOCSaveVaultAgoMinutes">{0} min ago</sys:String>
@@ -41,9 +45,17 @@
     <sys:String x:Key="LOCSaveVaultErrRootRelative">The backup folder must be an absolute path.</sys:String>
     <sys:String x:Key="LOCSaveVaultErrorArchiveMissing">The snapshot file is missing.</sys:String>
     <sys:String x:Key="LOCSaveVaultErrorRoot">The vault folder is not writable.</sys:String>
+    <sys:String x:Key="LOCSaveVaultExcludeDropAsk">Excluded games are still holding {0} snapshots, taking up {1}. Delete them now?</sys:String>
+    <sys:String x:Key="LOCSaveVaultExcludeDropDone">Deleted {0} snapshots.</sys:String>
+    <sys:String x:Key="LOCSaveVaultExcludeManyAsk">Stop backing up all {0} games in the list?</sys:String>
+    <sys:String x:Key="LOCSaveVaultExcludeNone">No game is excluded.</sys:String>
+    <sys:String x:Key="LOCSaveVaultExcludeNothing">No excluded game is holding on to snapshots.</sys:String>
+    <sys:String x:Key="LOCSaveVaultExcludeSummary">{0} excluded · {1} still stored</sys:String>
     <sys:String x:Key="LOCSaveVaultExcludedMark">excluded</sys:String>
     <sys:String x:Key="LOCSaveVaultFilesWord">files</sys:String>
     <sys:String x:Key="LOCSaveVaultFilterHint">Filter games by name</sys:String>
+    <sys:String x:Key="LOCSaveVaultIncludeHeader">Ticked games are backed up automatically.</sys:String>
+    <sys:String x:Key="LOCSaveVaultIncludeHint">Untick to skip this game in automatic and library wide backups. Backing it up by hand still works, and existing snapshots are kept.</sys:String>
     <sys:String x:Key="LOCSaveVaultKindFolder">Files</sys:String>
     <sys:String x:Key="LOCSaveVaultKindRegistry">Registry</sys:String>
     <sys:String x:Key="LOCSaveVaultLocationsCount">{0} locations</sys:String>
@@ -53,7 +65,8 @@
     <sys:String x:Key="LOCSaveVaultMenuBackupAll">Back up the whole library</sys:String>
     <sys:String x:Key="LOCSaveVaultMenuDetect">Find save locations</sys:String>
     <sys:String x:Key="LOCSaveVaultMenuDetectAll">Find save locations for every game</sys:String>
-    <sys:String x:Key="LOCSaveVaultMenuExclude">Skip during library backups</sys:String>
+    <sys:String x:Key="LOCSaveVaultMenuExclude">Skip automatic backups</sys:String>
+    <sys:String x:Key="LOCSaveVaultMenuInclude">Resume automatic backups</sys:String>
     <sys:String x:Key="LOCSaveVaultMenuManage">Open Save Vault…</sys:String>
     <sys:String x:Key="LOCSaveVaultMenuOpenFolder">Open the backup folder</sys:String>
     <sys:String x:Key="LOCSaveVaultMenuPrune">Apply the retention policy</sys:String>
@@ -96,6 +109,8 @@
     <sys:String x:Key="LOCSaveVaultOptScheduled">Back up on a schedule</sys:String>
     <sys:String x:Key="LOCSaveVaultOptScheduledHint">Checks once per interval while Playnite is running. Only games whose saves changed get a new snapshot.</sys:String>
     <sys:String x:Key="LOCSaveVaultOptSnapshotHint">A game whose save location is bigger than this is skipped and reported instead of eating the whole vault budget. 0 removes the limit.</sys:String>
+    <sys:String x:Key="LOCSaveVaultOptTopPanel">Show a button in the top panel</sys:String>
+    <sys:String x:Key="LOCSaveVaultOptTopPanelHint">Opens the vault in one click, and shows how much of the size budget is used.</sys:String>
     <sys:String x:Key="LOCSaveVaultOptUseLudusavi">Use the Ludusavi manifest</sys:String>
     <sys:String x:Key="LOCSaveVaultOptUseLudusaviHint">Reads Ludusavi's save-path database as one more hint. Ludusavi itself is not required, and Japanese niche titles are usually missing from it.</sys:String>
     <sys:String x:Key="LOCSaveVaultOriginInstallFolder">Install folder</sys:String>
@@ -110,6 +125,7 @@
     <sys:String x:Key="LOCSaveVaultProgressBackupAll">Backing up the whole library</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressDetect">Looking for save locations</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressDetectAll">Looking for save locations in the whole library</sys:String>
+    <sys:String x:Key="LOCSaveVaultProgressDrop">Deleting snapshots</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressPrune">Applying retention rules</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressPurgeLearned">Re-checking learned locations</sys:String>
     <sys:String x:Key="LOCSaveVaultProgressRestore">Restoring</sys:String>
@@ -130,6 +146,9 @@
     <sys:String x:Key="LOCSaveVaultRestoreUndoHint">The current state is saved as a snapshot first, so this can be undone.</sys:String>
     <sys:String x:Key="LOCSaveVaultRowStatus">{0} snapshots · {1}</sys:String>
     <sys:String x:Key="LOCSaveVaultScheduledDone">Scheduled backup:</sys:String>
+    <sys:String x:Key="LOCSaveVaultScopeAll">Whole library</sys:String>
+    <sys:String x:Key="LOCSaveVaultScopeExcluded">Excluded only</sys:String>
+    <sys:String x:Key="LOCSaveVaultScopeVault">In the vault</sys:String>
     <sys:String x:Key="LOCSaveVaultSettingsAbout">About</sys:String>
     <sys:String x:Key="LOCSaveVaultSettingsBackup">Backup</sys:String>
     <sys:String x:Key="LOCSaveVaultSettingsDetect">Detection</sys:String>
@@ -142,6 +161,7 @@
     <sys:String x:Key="LOCSaveVaultSnapshotsCaption">Snapshots</sys:String>
     <sys:String x:Key="LOCSaveVaultSnapshotsWord">snapshots</sys:String>
     <sys:String x:Key="LOCSaveVaultStatCreated">New snapshots:</sys:String>
+    <sys:String x:Key="LOCSaveVaultStatExcluded">Skipped, not backed up automatically:</sys:String>
     <sys:String x:Key="LOCSaveVaultStatFailed">Failed:</sys:String>
     <sys:String x:Key="LOCSaveVaultStatNoTargets">No known location:</sys:String>
     <sys:String x:Key="LOCSaveVaultStatOversized">Too large:</sys:String>
@@ -157,6 +177,7 @@
     <sys:String x:Key="LOCSaveVaultTargetsCaption">Save locations</sys:String>
     <sys:String x:Key="LOCSaveVaultTooLarge">The save location of this game holds {0}, more than the per snapshot limit of {1}. Nothing was written.</sys:String>
     <sys:String x:Key="LOCSaveVaultTooLargeHint">Remove the location that is too big in the manager, narrow it with a file filter, or raise the limit in the settings.</sys:String>
+    <sys:String x:Key="LOCSaveVaultTopPanelUsage">{0} of {1} used</sys:String>
     <sys:String x:Key="LOCSaveVaultTotals">{0} games · {1} snapshots · {2} of {3}</sys:String>
     <sys:String x:Key="LOCSaveVaultTriggerBeforeLaunch">Before launch</sys:String>
     <sys:String x:Key="LOCSaveVaultTriggerBeforeRestore">Undo point</sys:String>

@@ -36,6 +36,7 @@ namespace SaveVault
 
         private GameVaultViewModel panel;
         private VaultManagerViewModel manager;
+        private TopPanelItem topPanel;
 
         public override Guid Id { get; } = Guid.Parse("fd085db8-9b7c-4f83-a2df-3f0784eae1d0");
 
@@ -64,6 +65,10 @@ namespace SaveVault
             // happen before OnApplicationStarted fires, so both are primed here as well.
             Localization.Load(PluginFolder, api == null ? null : api.ApplicationSettings.Language);
             ThemeBridge.EnsureDefaults();
+
+            // Keeps the top panel tooltip honest: a size budget nobody can see is a size budget
+            // nobody manages.
+            controller.Changed += (sender, e) => RefreshTopPanel();
         }
 
         /// <summary>Folder the add-on was installed into, which is where Localization lives.</summary>
@@ -195,6 +200,11 @@ namespace SaveVault
             try
             {
                 var profile = store.Find(game.Id);
+                if (profile != null && profile.Excluded)
+                {
+                    return;
+                }
+
                 if (settings.AutoScanNewGames && (profile == null || !profile.HasTargets))
                 {
                     controller.Detect(game);
@@ -215,6 +225,12 @@ namespace SaveVault
         {
             var game = args == null ? null : args.Game;
             if (game == null || !settings.RuntimeLearning)
+            {
+                return;
+            }
+
+            var profile = store.Find(game.Id);
+            if (profile != null && profile.Excluded)
             {
                 return;
             }
@@ -335,11 +351,83 @@ namespace SaveVault
                 window.Height = 640;
                 window.Owner = PlayniteApi.Dialogs.GetCurrentAppWindow();
                 window.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner;
+
+                // The manager is modal, so a settings window opened from inside it would be
+                // trapped behind it. Remember the request and honour it after the dialog closes.
+                var wantSettings = false;
+                model.OpenSettingsAction = () => { wantSettings = true; window.Close(); };
                 window.ShowDialog();
+                model.OpenSettingsAction = null;
+
+                if (wantSettings)
+                {
+                    OpenSettingsView();
+                }
             }
             catch (Exception e)
             {
                 logger.Error(e, "Save Vault: could not open the manager window.");
+            }
+        }
+
+        // ------------------------------------------------------------------ top panel
+
+        /// <summary>
+        /// One button next to Playnite's own top panel icons. The vault is where exclusions,
+        /// restores and the size budget are handled, and three levels deep in the main menu is the
+        /// reason a user never opens it.
+        /// </summary>
+        public override IEnumerable<TopPanelItem> GetTopPanelItems()
+        {
+            if (!settings.ShowTopPanelButton)
+            {
+                yield break;
+            }
+
+            if (topPanel == null)
+            {
+                topPanel = new TopPanelItem();
+                // IcoFont "save" glyph, from the icon font Playnite ships with.
+                topPanel.Icon = new TextBlock
+                {
+                    Text = char.ConvertFromUtf32(0xee00),
+                    FontSize = 16,
+                    FontFamily = ResourceProvider.GetResource<System.Windows.Media.FontFamily>("FontIcoFont")
+                };
+                topPanel.Activated = () => OpenManager(null);
+                RefreshTopPanel();
+            }
+
+            yield return topPanel;
+        }
+
+        /// <summary>Restates the vault name plus what the budget is currently spent on.</summary>
+        private void RefreshTopPanel()
+        {
+            var item = topPanel;
+            if (item == null)
+            {
+                return;
+            }
+
+            var app = System.Windows.Application.Current;
+            if (app != null && !app.Dispatcher.CheckAccess())
+            {
+                app.Dispatcher.BeginInvoke(new Action(RefreshTopPanel));
+                return;
+            }
+
+            try
+            {
+                var quota = (long)Math.Max(1, settings.MaxTotalMegabytes) * 1024L * 1024L;
+                item.Title = VaultController.Name() + "  ·  " +
+                    Localization.Fill("LOCSaveVaultTopPanelUsage", "{0} of {1} used",
+                        VaultController.FormatSize(store.TotalBytes()), VaultController.FormatSize(quota));
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Save Vault: could not refresh the top panel item.");
+                item.Title = VaultController.Name();
             }
         }
 
@@ -389,11 +477,22 @@ namespace SaveVault
                 };
             }
 
+            // Excluded games are still restorable and can still be backed up by hand; they are
+            // only skipped by every automatic pass. Label the item after the current state so the
+            // menu never lies about what clicking it will do.
+            var allExcluded = games.Count > 0 && games.All(game =>
+            {
+                var profile = store.Find(game.Id);
+                return profile != null && profile.Excluded;
+            });
+
             yield return new GameMenuItem
             {
                 MenuSection = section,
-                Description = Localization.Get("LOCSaveVaultMenuExclude", "Skip during library backups"),
-                Action = context => ToggleExcluded(context.Games)
+                Description = allExcluded
+                    ? Localization.Get("LOCSaveVaultMenuInclude", "Resume automatic backups")
+                    : Localization.Get("LOCSaveVaultMenuExclude", "Skip automatic backups"),
+                Action = context => controller.SetExcluded(context.Games, !allExcluded, true)
             };
         }
 
@@ -597,41 +696,6 @@ namespace SaveVault
             }
 
             controller.OpenVaultFolder(profile);
-        }
-
-        /// <summary>
-        /// Flips the flag for the whole selection. Excluded games keep their snapshots and can
-        /// still be backed up by hand; they are only skipped by the library wide passes.
-        /// </summary>
-        private void ToggleExcluded(List<Game> games)
-        {
-            if (games == null || games.Count == 0)
-            {
-                return;
-            }
-
-            var target = !games.All(game =>
-            {
-                var profile = store.Find(game.Id);
-                return profile != null && profile.Excluded;
-            });
-
-            foreach (var game in games)
-            {
-                store.GetOrCreate(game).Excluded = target;
-            }
-
-            store.Save();
-
-            if (panel != null)
-            {
-                panel.Reload();
-            }
-
-            if (manager != null)
-            {
-                manager.Reload();
-            }
         }
     }
 }
